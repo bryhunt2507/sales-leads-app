@@ -1,0 +1,595 @@
+import { useEffect, useState } from 'react'
+import { supabase } from './supabaseClient'
+import AdminOptions from './AdminOptions.jsx'
+
+async function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const s = String(reader.result || '')
+      const comma = s.indexOf(',')
+      resolve(comma >= 0 ? s.slice(comma + 1) : s)
+    }
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
+
+// Use the organization id you inserted earlier
+const ORGANIZATION_ID = 'a0a50cfb-f1e9-4515-8176-61e2625350d9'
+
+function App() {
+  // Which view are we on? 'entry' or 'admin'
+  const [view, setView] = useState('entry')
+
+  // TODO: point this to your real OCR backend / Apps Script web app
+const CARD_OCR_ENDPOINT = 'https://YOUR-CARD-OCR-ENDPOINT-HERE'
+
+async function handleScanCard() {
+  try {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = 'image/*'
+    input.capture = 'environment' // prefer rear camera on mobile
+
+    input.onchange = async () => {
+      const file = input.files?.[0]
+      if (!file) return
+
+      setStatusMsg(null)
+      setLocStatus('Processing card photo…')
+
+      try {
+        const base64 = await fileToBase64(file)
+
+        // 🔗 Send image to your OCR backend
+        const res = await fetch(CARD_OCR_ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imageBase64: base64,
+            // optionally pass current lat/lng if you want:
+            latitude: form.latitude,
+            longitude: form.longitude,
+          }),
+        })
+
+        if (!res.ok) {
+          console.error('Card OCR error:', res.status, await res.text())
+          setLocStatus('Card scan failed. Please try again.')
+          return
+        }
+
+        const data = await res.json()
+
+        // Expecting something like:
+        // { company, contact, email, phone, imageUrl }
+        setForm(prev => ({
+          ...prev,
+          company: data.company || prev.company,
+          contact_name: data.contact || prev.contact_name,
+          email: data.email || prev.email,
+          phone: data.phone || prev.phone,
+          // later we can also store data.imageUrl in DB when we add that column
+        }))
+
+        setLocStatus('Card scanned. Fields updated from the card ✅')
+      } catch (err) {
+        console.error(err)
+        setLocStatus('Card scan failed. Please try again.')
+      }
+    }
+
+    input.click()
+  } catch (e) {
+    console.error(e)
+  }
+}
+
+  // Dropdown options
+  const [statusOptions, setStatusOptions] = useState([])
+  const [ratingOptions, setRatingOptions] = useState([])
+  const [industryOptions, setIndustryOptions] = useState([])
+  const [loadingOptions, setLoadingOptions] = useState(true)
+
+  // Form state
+  const [form, setForm] = useState({
+    company: '',
+    contact_name: '',
+    email: '',
+    phone: '',
+    note: '',
+    status: '',
+    rating: '',
+    industry: '',
+    latitude: '',
+    longitude: '',
+  })
+
+  const [statusMsg, setStatusMsg] = useState(null)
+  const [loading, setLoading] = useState(false)
+
+  // Leads list
+  const [leads, setLeads] = useState([])
+  const [loadingLeads, setLoadingLeads] = useState(true)
+  const [locStatus, setLocStatus] = useState(null)
+
+  function handleChange(e) {
+    const { name, value } = e.target
+    setForm(prev => ({ ...prev, [name]: value }))
+  }
+
+  // Load dropdown options from Supabase
+  async function loadOptionLists() {
+    setLoadingOptions(true)
+
+    const [statusRes, ratingRes, industryRes] = await Promise.all([
+      supabase
+        .from('call_status_options')
+        .select('*')
+        .eq('organization_id', ORGANIZATION_ID)
+        .eq('active', true)
+        .order('sort_order', { ascending: true }),
+      supabase
+        .from('rating_options')
+        .select('*')
+        .eq('organization_id', ORGANIZATION_ID)
+        .eq('active', true)
+        .order('sort_order', { ascending: true }),
+      supabase
+        .from('industry_options')
+        .select('*')
+        .eq('organization_id', ORGANIZATION_ID)
+        .eq('active', true)
+        .order('sort_order', { ascending: true }),
+    ])
+
+    if (statusRes.error) console.error('Status options error:', statusRes.error)
+    if (ratingRes.error) console.error('Rating options error:', ratingRes.error)
+    if (industryRes.error) console.error('Industry options error:', industryRes.error)
+
+    if (!statusRes.error && statusRes.data) setStatusOptions(statusRes.data)
+    if (!ratingRes.error && ratingRes.data) setRatingOptions(ratingRes.data)
+    if (!industryRes.error && industryRes.data) setIndustryOptions(industryRes.data)
+
+    setLoadingOptions(false)
+  }
+
+  // Load leads
+  async function loadLeads() {
+    setLoadingLeads(true)
+    const { data, error } = await supabase
+      .from('leads')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(20)
+
+    if (error) {
+      console.error('Error loading leads:', error)
+    } else {
+      setLeads(data || [])
+    }
+    setLoadingLeads(false)
+  }
+
+  useEffect(() => {
+  loadLeads()
+  loadOptionLists()
+  autoGetLocation()
+}, [])
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    setLoading(true)
+    setStatusMsg(null)
+
+    if (!form.company && !form.contact_name) {
+      setStatusMsg('error')
+      setLoading(false)
+      return
+    }
+
+    const { data, error } = await supabase
+      .from('leads')
+      .insert([
+        {
+          organization_id: ORGANIZATION_ID,
+          company: form.company,
+          contact_name: form.contact_name,
+          email: form.email,
+          phone: form.phone,
+          note: form.note,
+          status: form.status,
+          rating: form.rating,
+          industry: form.industry,
+          latitude: form.latitude ? Number(form.latitude) : null,
+          longitude: form.longitude ? Number(form.longitude) : null,
+          location_source: form.latitude && form.longitude ? 'gps' : null,
+        },
+      ])
+      .select()
+
+    if (error) {
+      console.error(error)
+      setStatusMsg('error')
+    } else {
+      setStatusMsg('success')
+      setForm({
+        company: '',
+        contact_name: '',
+        email: '',
+        phone: '',
+        note: '',
+        status: '',
+        rating: '',
+        industry: '',
+        latitude: '',
+        longitude: '',
+      })
+
+      if (data && data.length > 0) {
+        setLeads(prev => [data[0], ...prev].slice(0, 20))
+      }
+    }
+
+    setLoading(false)
+  }
+
+function autoGetLocation() {
+  if (!navigator.geolocation) {
+    setLocStatus('Geolocation not supported on this device.')
+    return
+  }
+
+  setLocStatus('Getting your location…')
+
+  navigator.geolocation.getCurrentPosition(
+    position => {
+      const { latitude, longitude } = position.coords
+      setForm(prev => ({
+        ...prev,
+        latitude: latitude.toString(),
+        longitude: longitude.toString(),
+      }))
+      setLocStatus(
+        `Location detected: ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`
+      )
+    },
+    error => {
+      console.error(error)
+      setLocStatus('Unable to get location.')
+    },
+    {
+      enableHighAccuracy: true,
+      timeout: 10000,
+    }
+  )
+}
+
+
+  return (
+    <>
+      {/* Top nav/header */}
+      <header>
+        <div className="header-inner">
+          <div className="brand">
+            <div className="brand-logo" />
+            <span>LaborMAX Sales</span>
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button
+              type="button"
+              onClick={() => setView('entry')}
+              style={{
+                background: view === 'entry' ? '#ffffff22' : 'transparent',
+                borderRadius: 999,
+                padding: '6px 10px',
+                fontSize: '0.8rem',
+                boxShadow: 'none',
+              }}
+            >
+              Entry
+            </button>
+            <button
+              type="button"
+              onClick={() => setView('admin')}
+              style={{
+                background: view === 'admin' ? '#ffffff22' : 'transparent',
+                borderRadius: 999,
+                padding: '6px 10px',
+                fontSize: '0.8rem',
+                boxShadow: 'none',
+              }}
+            >
+              Admin
+            </button>
+            <div className="user-badge">Bryan Hunt</div>
+          </div>
+        </div>
+      </header>
+
+      <main>
+        <div className="card">
+          {view === 'entry' ? (
+            <>
+              <h1>Sales Activity Entry</h1>
+
+              {/* Scan card button (optional) */}
+<button
+  type="button"
+  onClick={handleScanCard}
+  style={{
+    width: '100%',
+    marginBottom: 16,
+    padding: '14px 16px',
+    fontWeight: 600,
+    borderRadius: 12,
+    border: 'none',
+    background: 'var(--navy)',
+    color: 'white',
+    fontSize: '1rem',
+    boxShadow: 'var(--shadow)',
+  }}
+>
+  📷 Scan Business Card (Optional)
+</button>
+
+              {/* LEAD FORM */}
+              <form onSubmit={handleSubmit}>
+                <div className="section-title">Contact Info</div>
+                <div className="section-divider" />
+
+                <label>
+                  Company (required)
+                  <input
+                    name="company"
+                    placeholder="Company Name"
+                    value={form.company}
+                    onChange={handleChange}
+                  />
+                </label>
+
+                <div className="row">
+                  <div>
+                    <label>
+                      Contact Name
+                      <input
+                        name="contact_name"
+                        placeholder="Contact Name"
+                        value={form.contact_name}
+                        onChange={handleChange}
+                      />
+                    </label>
+                  </div>
+                  <div>
+                    <label>
+                      Phone Number
+                      <input
+                        name="phone"
+                        placeholder="(000) 000-0000"
+                        value={form.phone}
+                        onChange={handleChange}
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                <div className="row">
+                  <div>
+                    <label>
+                      Email Address
+                      <input
+                        name="email"
+                        placeholder="Email Address"
+                        value={form.email}
+                        onChange={handleChange}
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                <div className="section-title">Call Notes</div>
+                <div className="section-divider" />
+
+                <label>
+                  Call Note
+                  <textarea
+                    name="note"
+                    placeholder="Note (Required)"
+                    value={form.note}
+                    onChange={handleChange}
+                  />
+                </label>
+
+                <div className="section-title">Call Details</div>
+                <div className="section-divider" />
+
+                <label>
+                  Call Type / Status
+                  <select
+                    name="status"
+                    value={form.status}
+                    onChange={handleChange}
+                  >
+                    <option value="">
+                      {loadingOptions ? 'Loading…' : 'Select Call Type'}
+                    </option>
+                    {statusOptions.map(opt => (
+                      <option key={opt.id} value={opt.label}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label>
+                  Call Rating
+                  <select
+                    name="rating"
+                    value={form.rating}
+                    onChange={handleChange}
+                  >
+                    <option value="">
+                      {loadingOptions ? 'Loading…' : 'Select Rating'}
+                    </option>
+                    {ratingOptions.map(opt => (
+                      <option key={opt.id} value={opt.label}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label>
+                  Industry
+                  <select
+                    name="industry"
+                    value={form.industry}
+                    onChange={handleChange}
+                  >
+                    <option value="">
+                      {loadingOptions ? 'Loading…' : 'Select Industry'}
+                    </option>
+                    {industryOptions.map(opt => (
+                      <option key={opt.id} value={opt.label}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <div className="section-title">Location</div>
+<div className="section-divider" />
+
+{/* Hidden lat/long fields still stored in state & sent to Supabase */}
+<div style={{ display: 'none' }}>
+  <input
+    name="latitude"
+    value={form.latitude}
+    onChange={handleChange}
+  />
+  <input
+    name="longitude"
+    value={form.longitude}
+    onChange={handleChange}
+  />
+</div>
+
+{locStatus && (
+  <div className="helper" style={{ marginTop: 8, marginBottom: 16 }}>
+    {locStatus}
+  </div>
+)}
+
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="primary"
+                  style={{ width: '100%', marginTop: 20 }}
+                >
+                  {loading ? 'Saving…' : 'Submit'}
+                </button>
+
+                {statusMsg === 'success' && (
+                  <p style={{ color: 'green', marginTop: 8 }}>Lead saved ✅</p>
+                )}
+                {statusMsg === 'error' && (
+                  <p style={{ color: 'red', marginTop: 8 }}>
+                    Something went wrong. Check console / Supabase settings.
+                  </p>
+                )}
+              </form>
+
+              {/* RECENT LEADS */}
+              <div style={{ marginTop: 24 }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: 8,
+                  }}
+                >
+                  <span className="section-title" style={{ marginTop: 0 }}>
+                    Recent Leads
+                  </span>
+                  <button
+                    type="button"
+                    onClick={loadLeads}
+                    disabled={loadingLeads}
+                    style={{ fontSize: '0.8rem', padding: '6px 10px' }}
+                  >
+                    {loadingLeads ? 'Refreshing…' : 'Refresh'}
+                  </button>
+                </div>
+
+                {loadingLeads && <p>Loading…</p>}
+
+                {!loadingLeads && leads.length === 0 && (
+                  <p className="helper">
+                    No leads yet. Add your first one above.
+                  </p>
+                )}
+
+                <div
+                  style={{ display: 'flex', flexDirection: 'column', gap: 6 }}
+                >
+                  {leads.map(lead => (
+                    <div key={lead.id} className="lead-card">
+                      <strong>{lead.company}</strong>
+                      {lead.contact_name && <div>{lead.contact_name}</div>}
+                      {(lead.email || lead.phone) && (
+                        <div style={{ opacity: 0.8 }}>
+                          {lead.email && <span>{lead.email}</span>}
+                          {lead.email && lead.phone && <span> · </span>}
+                          {lead.phone && <span>{lead.phone}</span>}
+                        </div>
+                      )}
+                      {(lead.status ||
+                        lead.rating ||
+                        lead.industry) && (
+                        <div style={{ marginTop: 4, opacity: 0.9 }}>
+                          {lead.status && (
+                            <span>Status: {lead.status}</span>
+                          )}
+                          {lead.status &&
+                            (lead.rating || lead.industry) && <span> · </span>}
+                          {lead.rating && (
+                            <span>Rating: {lead.rating}</span>
+                          )}
+                          {lead.rating && lead.industry && <span> · </span>}
+                          {lead.industry && (
+                            <span>Industry: {lead.industry}</span>
+                          )}
+                        </div>
+                      )}
+                      {lead.latitude && lead.longitude && (
+                        <div style={{ marginTop: 4, opacity: 0.7 }}>
+                          📍 {lead.latitude}, {lead.longitude}
+                        </div>
+                      )}
+                      {lead.note && (
+                        <div style={{ marginTop: 4 }}>{lead.note}</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          ) : (
+            <AdminOptions
+              organizationId={ORGANIZATION_ID}
+              statusOptions={statusOptions}
+              ratingOptions={ratingOptions}
+              industryOptions={industryOptions}
+              reloadOptions={loadOptionLists}
+            />
+          )}
+        </div>
+      </main>
+    </>
+  )
+}
+
+export default App
