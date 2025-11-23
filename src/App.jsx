@@ -21,6 +21,8 @@ const ORGANIZATION_ID = 'a0a50cfb-f1e9-4515-8176-61e2625350d9'
 function App() {
   // Which view are we on? 'entry' or 'admin'
   const [view, setView] = useState('entry')
+  const [selectedBusiness, setSelectedBusiness] = useState(null)
+
 
   // OCR endpoint
   const CARD_OCR_ENDPOINT = '/api/ocr'
@@ -328,10 +330,15 @@ function App() {
         setBusinesses([])
       } else {
         const json = await res.json()
-        setBusinesses(json.businesses || [])
-        if (!json.businesses || json.businesses.length === 0) {
-          setBusinessError('No nearby businesses found.')
-        }
+const bizList = json.businesses || []
+
+setBusinesses(bizList)
+setSelectedBusiness(bizList.length > 0 ? bizList[0] : null)
+
+if (bizList.length === 0) {
+  setBusinessError('No nearby businesses found.')
+}
+
       }
     } catch (err) {
       console.error(err)
@@ -759,54 +766,120 @@ function App() {
                       }}
                     >
                       {businesses.map(biz => (
-                        <button
-                          key={biz.place_id}
-                          type="button"
-                          onClick={() => handleSelectBusiness(biz)}
-                          style={{
-                            textAlign: 'left',
-                            padding: 10,
-                            borderRadius: 12,
-                            border: '1px solid var(--border)',
-                            background: '#f9fafb',
-                            boxShadow: 'none',
-                            minHeight: 0,
-                            fontSize: '0.9rem',
-                          }}
-                        >
-                          <div style={{ fontWeight: 700 }}>{biz.name}</div>
-                          {biz.address && (
-                            <div
-                              style={{
-                                fontSize: '0.8rem',
-                                color: '#4b5563',
-                                marginTop: 2,
-                              }}
-                            >
-                              {biz.address}
-                            </div>
-                          )}
-                          {(biz.phone || biz.website) && (
-                            <div
-                              style={{
-                                fontSize: '0.8rem',
-                                color: '#4b5563',
-                                marginTop: 2,
-                              }}
-                            >
-                              {biz.phone && <span>{biz.phone}</span>}
-                              {biz.phone && biz.website && (
-                                <span>{' • '}</span>
-                              )}
-                              {biz.website && (
-                                <span>
-                                  {biz.website.replace(/^https?:\/\//, '')}
-                                </span>
-                              )}
-                            </div>
-                          )}
-                        </button>
-                      ))}
+  <button
+    key={biz.place_id}
+    type="button"
+    onClick={() => setSelectedBusiness(biz)}
+    style={{
+      textAlign: 'left',
+      padding: 10,
+      borderRadius: 12,
+      border: '1px solid var(--border)',
+      background:
+        selectedBusiness && selectedBusiness.place_id === biz.place_id
+          ? '#e5f0ff'
+          : '#f9fafb',
+      boxShadow: 'none',
+      minHeight: 0,
+      fontSize: '0.9rem',
+    }}
+  >
+    <div style={{ fontWeight: 700 }}>
+      {biz.name || biz.address}
+    </div>
+    {biz.address && (
+      <div
+        style={{
+          fontSize: '0.8rem',
+          color: '#4b5563',
+          marginTop: 2,
+        }}
+      >
+        {biz.address}
+      </div>
+    )}
+  </button>
+))}
+{selectedBusiness && (
+  <div
+    style={{
+      marginTop: 12,
+      paddingTop: 8,
+      borderTop: '1px solid #e5e7eb',
+    }}
+  >
+    <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>
+      {selectedBusiness.name || selectedBusiness.address}
+    </div>
+    {selectedBusiness.address && (
+      <div
+        style={{
+          fontSize: '0.85rem',
+          color: '#4b5563',
+          marginTop: 2,
+        }}
+      >
+        {selectedBusiness.address}
+      </div>
+    )}
+    {(selectedBusiness.phone || selectedBusiness.website) && (
+      <div
+        style={{
+          fontSize: '0.8rem',
+          color: '#4b5563',
+          marginTop: 4,
+        }}
+      >
+        {selectedBusiness.phone && (
+          <span>{selectedBusiness.phone}</span>
+        )}
+        {selectedBusiness.phone && selectedBusiness.website && (
+          <span>{' • '}</span>
+        )}
+        {selectedBusiness.website && (
+          <span>
+            {selectedBusiness.website.replace(/^https?:\/\//, '')}
+          </span>
+        )}
+      </div>
+    )}
+
+    {/* Mini map preview */}
+    {selectedBusiness.lat &&
+      selectedBusiness.lng &&
+      import.meta.env.VITE_GOOGLE_MAPS_BROWSER_KEY && (
+        <div style={{ marginTop: 8 }}>
+          <img
+            src={`https://maps.googleapis.com/maps/api/staticmap?center=${selectedBusiness.lat},${selectedBusiness.lng}&zoom=15&size=600x250&markers=color:red|${selectedBusiness.lat},${selectedBusiness.lng}&key=${
+              import.meta.env.VITE_GOOGLE_MAPS_BROWSER_KEY
+            }`}
+            alt="Map preview"
+            style={{ width: '100%', borderRadius: 12 }}
+          />
+        </div>
+      )}
+
+    <button
+      type="button"
+      onClick={() => handleSelectBusiness(selectedBusiness)}
+      style={{
+        width: '100%',
+        marginTop: 10,
+        minHeight: 40,
+        fontSize: '0.9rem',
+        fontWeight: 600,
+        borderRadius: 999,
+        border: 'none',
+        background: 'var(--navy)',
+        color: '#fff',
+        boxShadow: 'var(--shadow)',
+      }}
+    >
+      Use this business
+    </button>
+  </div>
+)}
+
                     </div>
 
                     <button
