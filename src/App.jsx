@@ -18,10 +18,17 @@ async function fileToBase64(file) {
   })
 }
 
-// Use the organization id you inserted earlier
-const ORGANIZATION_ID = 'a0a50cfb-f1e9-4515-8176-61e2625350d9'
+// Default organization for legacy use (LaborMax main branch)
+const DEFAULT_ORGANIZATION_ID = 'a0a50cfb-f1e9-4515-8176-61e2625350d9'
+
 
 function App() {
+
+    // Auth / profile / organization
+  const [profile, setProfile] = useState(null)
+  const [organizationId, setOrganizationId] = useState(DEFAULT_ORGANIZATION_ID)
+  const [authLoading, setAuthLoading] = useState(true)
+
   // 'home' | 'entry' | 'admin'
   const [view, setView] = useState('home')
   const [selectedBusiness, setSelectedBusiness] = useState(null)
@@ -70,6 +77,43 @@ function App() {
         ? selectedBusiness.category
         : selectedBusiness.category.text || ''
       : ''
+
+        // Load current auth user & profile (company/org/role)
+  useEffect(() => {
+    async function loadProfile() {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser()
+
+        if (!user || !user.email) {
+          setAuthLoading(false)
+          return
+        }
+
+        const { data: prof, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('email', user.email)
+          .single()
+
+        if (!error && prof) {
+          setProfile(prof)
+          if (prof.organization_id) {
+            setOrganizationId(prof.organization_id)
+          }
+        } else {
+          console.log('No profile row for user yet', error)
+        }
+      } catch (err) {
+        console.error('Error loading auth profile', err)
+      } finally {
+        setAuthLoading(false)
+      }
+    }
+
+    loadProfile()
+  }, [])
 
   function handleChange(e) {
     const { name, value } = e.target
@@ -142,19 +186,19 @@ function App() {
       supabase
         .from('call_status_options')
         .select('*')
-        .eq('organization_id', ORGANIZATION_ID)
+        .eq('organization_id', organizationId)
         .eq('active', true)
         .order('sort_order', { ascending: true }),
       supabase
         .from('rating_options')
         .select('*')
-        .eq('organization_id', ORGANIZATION_ID)
+        .eq('organization_id', organizationId)
         .eq('active', true)
         .order('sort_order', { ascending: true }),
       supabase
         .from('industry_options')
         .select('*')
-        .eq('organization_id', ORGANIZATION_ID)
+        .eq('organization_id', organizationId)
         .eq('active', true)
         .order('sort_order', { ascending: true }),
     ])
@@ -174,11 +218,19 @@ function App() {
   // Load leads
   async function loadLeads() {
     setLoadingLeads(true)
-    const { data, error } = await supabase
+
+    let query = supabase
       .from('leads')
       .select('*')
       .order('created_at', { ascending: false })
       .limit(20)
+
+    if (organizationId) {
+      query = query.eq('organization_id', organizationId)
+    }
+
+    const { data, error } = await query
+
 
     if (error) {
       console.error('Error loading leads:', error)
@@ -187,12 +239,18 @@ function App() {
     }
     setLoadingLeads(false)
   }
-
+  // Get GPS location once
   useEffect(() => {
-    loadLeads()
-    loadOptionLists()
     autoGetLocation()
   }, [])
+
+  // Load org-scoped data once we know the org
+  useEffect(() => {
+    if (!organizationId) return
+    loadLeads()
+    loadOptionLists()
+  }, [organizationId])
+
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -209,7 +267,7 @@ function App() {
       .from('leads')
       .insert([
         {
-          organization_id: ORGANIZATION_ID,
+          organization_id: organizationId,
           company: form.company,
           contact_name: form.contact_name,
           email: form.email,
@@ -398,10 +456,13 @@ function App() {
     setShowBusinessPicker(false)
   }
 
+    const isAdmin =
+    profile?.role === 'owner' || profile?.role === 'admin'
+
   return (
     <>
       {/* Top nav/header */}
-      <header>
+                 <header>
         <div className="header-inner">
           <div className="brand">
             <div className="brand-logo" />
@@ -434,25 +495,29 @@ function App() {
             >
               Entry
             </button>
-            <button
-              type="button"
-              onClick={() => setView('admin')}
-              style={{
-                background: view === 'admin' ? '#ffffff22' : 'transparent',
-                borderRadius: 999,
-                padding: '6px 10px',
-                fontSize: '0.8rem',
-                boxShadow: 'none',
-              }}
-            >
-              Admin
-            </button>
-            <div className="user-badge">Bryan Hunt</div>
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => setView('admin')}
+                style={{
+                  background: view === 'admin' ? '#ffffff22' : 'transparent',
+                  borderRadius: 999,
+                  padding: '6px 10px',
+                  fontSize: '0.8rem',
+                  boxShadow: 'none',
+                }}
+              >
+                Admin
+              </button>
+            )}
+            <div className="user-badge">
+              {profile?.email || 'Not signed in'}
+            </div>
           </div>
         </div>
       </header>
 
-      <main>
+            <main>
         {view === 'home' ? (
           <MainHome />
         ) : (
@@ -1031,14 +1096,16 @@ function App() {
                   </div>
                 )}
               </>
-            ) : (
+            ) : isAdmin ? (
               <AdminOptions
-                organizationId={ORGANIZATION_ID}
+                organizationId={organizationId}
                 statusOptions={statusOptions}
                 ratingOptions={ratingOptions}
                 industryOptions={industryOptions}
                 reloadOptions={loadOptionLists}
               />
+            ) : (
+              <p>You don&apos;t have access to admin settings.</p>
             )}
           </div>
         )}
