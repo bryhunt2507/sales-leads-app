@@ -174,23 +174,24 @@ async function handleSendMagicLink(email) {
 
   // Start Google OAuth login
   async function handleProviderLogin() {
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: window.location.origin, // e.g. https://app.crmforstaffing.com
-        },
-      })
+  try {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: 'https://app.crmforstaffing.com',   // 👈 FIXED
+      },
+    });
 
-      if (error) {
-        console.error('OAuth error', error)
-        alert('Error starting Google sign-in: ' + error.message)
-      }
-    } catch (err) {
-      console.error('OAuth error', err)
-      alert('Error starting Google sign-in.')
+    if (error) {
+      console.error('OAuth error', error)
+      alert('Error starting Google sign-in: ' + error.message)
     }
+  } catch (err) {
+    console.error('OAuth error', err)
+    alert('Error starting Google sign-in.')
   }
+}
+
 
   // Log out
   async function handleLogout() {
