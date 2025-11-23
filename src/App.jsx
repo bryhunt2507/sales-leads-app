@@ -60,7 +60,7 @@ function App() {
   const [businessError, setBusinessError] = useState(null)
   const [showBusinessPicker, setShowBusinessPicker] = useState(false)
 
-  // 🔹 Safely turn category object/string into a plain label
+  // Safely turn category object/string into a plain label
   const categoryLabel =
     selectedBusiness && selectedBusiness.category
       ? typeof selectedBusiness.category === 'string'
@@ -73,6 +73,7 @@ function App() {
     setForm(prev => ({ ...prev, [name]: value }))
   }
 
+  // 🔹 Card OCR handler: ONLY handles scanning the card
   async function handleScanCard() {
     try {
       const input = document.createElement('input')
@@ -101,7 +102,7 @@ function App() {
           })
 
           if (!res.ok) {
-            console.error('Card OCR error:', res.status, await res.text())
+            console.error('OCR error', res.status)
             setLocStatus('Card scan failed. Please try again.')
             return
           }
@@ -278,6 +279,7 @@ function App() {
     )
   }
 
+  // 🔹 Nearby business handler
   async function handleFindNearbyBusinesses() {
     setBusinessError(null)
 
@@ -329,14 +331,36 @@ function App() {
         lat: lat.toString(),
         lng: lng.toString(),
       })
+
       const res = await fetch(`/api/places?${params.toString()}`)
-      if (!res.ok) {
-        const txt = await res.text()
-        console.error('Places error', res.status, txt)
-        setBusinessError('Nearby business lookup failed.')
+
+      // Always read as text first so Safari can’t explode inside res.json()
+      const raw = await res.text()
+      console.log('Places raw response:', raw)
+
+      // If dev server returned our HTML app shell, nearby search
+      // isn't available in local dev.
+      const trimmed = raw.trim().toLowerCase()
+      const looksLikeHtml =
+        trimmed.startsWith('<!doctype html') || trimmed.startsWith('<html')
+
+      if (!res.ok || looksLikeHtml) {
+        console.error('Places error or HTML shell', res.status, raw)
+        setBusinessError(
+          'Nearby business lookup only works on the live site right now. Try it at app.crmforstaffing.com.'
+        )
         setBusinesses([])
       } else {
-        const json = await res.json()
+        let json
+        try {
+          json = raw ? JSON.parse(raw) : {}
+        } catch (e) {
+          console.error('Places JSON parse error', e, raw)
+          setBusinessError('Nearby business lookup failed.')
+          setBusinesses([])
+          return
+        }
+
         const bizList = json.businesses || []
 
         setBusinesses(bizList)
@@ -347,13 +371,13 @@ function App() {
         }
       }
     } catch (err) {
-      console.error(err)
+      console.error('Places fetch failed:', err)
       setBusinessError('Nearby business lookup failed.')
       setBusinesses([])
+    } finally {
+      setLoadingBusinesses(false)
     }
-
-    setLoadingBusinesses(false)
-  }
+  } // end handleFindNearbyBusinesses
 
   function handleSelectBusiness(biz) {
     // Prefill form from selected business
@@ -382,7 +406,7 @@ function App() {
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <button
-              type="button"
+              type="button'
               onClick={() => setView('entry')}
               style={{
                 background: view === 'entry' ? '#ffffff22' : 'transparent',
