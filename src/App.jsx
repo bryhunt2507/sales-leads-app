@@ -74,7 +74,7 @@ function App() {
     setForm(prev => ({ ...prev, [name]: value }))
   }
 
-  // 🔹 Card OCR handler: ONLY handles scanning the card
+  // Card OCR handler
   async function handleScanCard() {
     try {
       const input = document.createElement('input')
@@ -280,7 +280,7 @@ function App() {
     )
   }
 
-  // 🔹 Nearby business handler
+  // Nearby business handler
   async function handleFindNearbyBusinesses() {
     setBusinessError(null)
 
@@ -378,7 +378,7 @@ function App() {
     } finally {
       setLoadingBusinesses(false)
     }
-  } // end handleFindNearbyBusinesses
+  }
 
   function handleSelectBusiness(biz) {
     // Prefill form from selected business
@@ -452,8 +452,10 @@ function App() {
 
       <main>
         {view === 'home' ? (
+          // 🔹 New CRM homepage
           <MainHome />
         ) : (
+          // 🔹 Original entry/admin card view
           <div className="card">
             {view === 'entry' ? (
               <>
@@ -852,7 +854,7 @@ function App() {
                               boxShadow: 'none',
                               minHeight: 0,
                               fontSize: '0.9rem',
-                              color: 'var(--ink)', // force dark text
+                              color: 'var(--ink)',
                             }}
                           >
                             <div style={{ fontWeight: 700 }}>
