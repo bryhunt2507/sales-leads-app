@@ -1,7 +1,7 @@
 // src/main.jsx
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import RootApp from './RootApp.jsx'   // <-- use the wrapper instead of App
+import RootApp from './RootApp.jsx'   // <--- important
 import './index.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
