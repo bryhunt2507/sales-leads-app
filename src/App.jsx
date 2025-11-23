@@ -2,7 +2,8 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
 import AdminOptions from './AdminOptions.jsx'
-import { MainHome } from './MainHome.jsx' // <-- named import
+import MainHome from './MainHome.jsx'
+ // <-- named import
 
 async function fileToBase64(file) {
   return new Promise((resolve, reject) => {
