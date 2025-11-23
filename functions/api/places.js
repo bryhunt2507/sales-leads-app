@@ -1,5 +1,5 @@
 // functions/api/places.js
-// Very minimal Google Places API (New) - places:searchNearby
+// Google Places API (New) - places:searchNearby
 
 export async function onRequest(context) {
   const { request, env } = context
@@ -23,7 +23,6 @@ export async function onRequest(context) {
   try {
     const endpoint = 'https://places.googleapis.com/v1/places:searchNearby'
 
-    // 🔹 Minimal body: just location + radius, no includedTypes
     const body = {
       maxResultCount: 15,
       locationRestriction: {
@@ -32,7 +31,7 @@ export async function onRequest(context) {
             latitude: Number(lat),
             longitude: Number(lng),
           },
-          radius: 1500.0, // meters
+          radius: 1500.0,
         },
       },
     }
@@ -42,9 +41,18 @@ export async function onRequest(context) {
       headers: {
         'Content-Type': 'application/json',
         'X-Goog-Api-Key': apiKey,
-        // 🔹 Very simple field mask; these are standard fields in the v1 Places response
-        'X-Goog-FieldMask':
-          'places.id,places.displayName,places.formattedAddress',
+        'X-Goog-FieldMask': [
+          'places.id',
+          'places.displayName',
+          'places.formattedAddress',
+          'places.location',
+          'places.nationalPhoneNumber',
+          'places.websiteUri',
+          'places.rating',
+          'places.userRatingCount',
+          'places.primaryTypeDisplayName',
+          'places.currentOpeningHours.openNow',
+        ].join(','),
       },
       body: JSON.stringify(body),
     })
@@ -69,8 +77,14 @@ export async function onRequest(context) {
       place_id: place.id,
       name: place.displayName?.text || '',
       address: place.formattedAddress || '',
-      phone: null,
-      website: null,
+      phone: place.nationalPhoneNumber || null,
+      website: place.websiteUri || null,
+      lat: place.location?.latitude ?? null,
+      lng: place.location?.longitude ?? null,
+      rating: place.rating ?? null,
+      ratingCount: place.userRatingCount ?? null,
+      category: place.primaryTypeDisplayName || null,
+      openNow: place.currentOpeningHours?.openNow ?? null,
     }))
 
     return jsonResponse({ businesses })
