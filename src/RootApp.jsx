@@ -3,14 +3,11 @@ import App from './App.jsx'
 import EnterpriseSignup from './EnterpriseSignup.jsx'
 
 export default function RootApp() {
-  const host = window.location.hostname
-  const isAdminHost = host.startsWith('admin.')
+  const hostname =
+    typeof window !== 'undefined' ? window.location.hostname : ''
 
-  if (isAdminHost) {
-    // admin.crmforstaffing.com
-    return <EnterpriseSignup />
-  }
+  const isAdminHost =
+    hostname === 'admin.crmforstaffing.com' || hostname.startsWith('admin.')
 
-  // app.crmforstaffing.com (and any other host)
-  return <App />
+  return isAdminHost ? <EnterpriseSignup /> : <App />
 }
