@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
 import AdminOptions from './AdminOptions.jsx'
+import MainHome from './MainHome.jsx'
 
 async function fileToBase64(file) {
   return new Promise((resolve, reject) => {
@@ -19,8 +20,8 @@ async function fileToBase64(file) {
 const ORGANIZATION_ID = 'a0a50cfb-f1e9-4515-8176-61e2625350d9'
 
 function App() {
-  // Which view are we on? 'entry' or 'admin'
-  const [view, setView] = useState('entry')
+  // Which view are we on? 'home' | 'entry' | 'admin'
+  const [view, setView] = useState('home')
   const [selectedBusiness, setSelectedBusiness] = useState(null)
 
   // OCR endpoint
@@ -406,7 +407,20 @@ function App() {
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <button
-              type="button'
+              type="button"
+              onClick={() => setView('home')}
+              style={{
+                background: view === 'home' ? '#ffffff22' : 'transparent',
+                borderRadius: 999,
+                padding: '6px 10px',
+                fontSize: '0.8rem',
+                boxShadow: 'none',
+              }}
+            >
+              Home
+            </button>
+            <button
+              type="button"
               onClick={() => setView('entry')}
               style={{
                 background: view === 'entry' ? '#ffffff22' : 'transparent',
@@ -437,567 +451,595 @@ function App() {
       </header>
 
       <main>
-        <div className="card">
-          {view === 'entry' ? (
-            <>
-              <h1>Sales Activity Entry</h1>
+        {view === 'home' ? (
+          <MainHome />
+        ) : (
+          <div className="card">
+            {view === 'entry' ? (
+              <>
+                <h1>Sales Activity Entry</h1>
 
-              {/* Scan card button (optional) */}
-              <button
-                type="button"
-                onClick={handleScanCard}
-                style={{
-                  width: '100%',
-                  marginBottom: 16,
-                  padding: '14px 16px',
-                  fontWeight: 600,
-                  borderRadius: 12,
-                  border: 'none',
-                  background: 'var(--navy)',
-                  color: 'white',
-                  fontSize: '1rem',
-                  boxShadow: 'var(--shadow)',
-                }}
-              >
-                📷 Scan Business Card (Optional)
-              </button>
-
-              {/* LEAD FORM */}
-              <form onSubmit={handleSubmit}>
-                <div className="section-title">Contact Info</div>
-                <div className="section-divider" />
-
-                <label>
-                  Company (required)
-                  <input
-                    name="company"
-                    placeholder="Company Name"
-                    value={form.company}
-                    onChange={handleChange}
-                  />
-                </label>
-
-                <div className="row">
-                  <div>
-                    <label>
-                      Contact Name
-                      <input
-                        name="contact_name"
-                        placeholder="Contact Name"
-                        value={form.contact_name}
-                        onChange={handleChange}
-                      />
-                    </label>
-                  </div>
-                  <div>
-                    <label>
-                      Phone Number
-                      <input
-                        name="phone"
-                        placeholder="(000) 000-0000"
-                        value={form.phone}
-                        onChange={handleChange}
-                      />
-                    </label>
-                  </div>
-                </div>
-
-                <div className="row">
-                  <div>
-                    <label>
-                      Email Address
-                      <input
-                        name="email"
-                        placeholder="Email Address"
-                        value={form.email}
-                        onChange={handleChange}
-                      />
-                    </label>
-                  </div>
-                </div>
-
-                <div className="section-title">Call Notes</div>
-                <div className="section-divider" />
-
-                <label>
-                  Call Note
-                  <textarea
-                    name="note"
-                    placeholder="Note (Required)"
-                    value={form.note}
-                    onChange={handleChange}
-                  />
-                </label>
-
-                <div className="section-title">Call Details</div>
-                <div className="section-divider" />
-
-                <label>
-                  Call Type / Status
-                  <select
-                    name="status"
-                    value={form.status}
-                    onChange={handleChange}
-                  >
-                    <option value="">
-                      {loadingOptions ? 'Loading…' : 'Select Call Type'}
-                    </option>
-                    {statusOptions.map(opt => (
-                      <option key={opt.id} value={opt.label}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label>
-                  Call Rating
-                  <select
-                    name="rating"
-                    value={form.rating}
-                    onChange={handleChange}
-                  >
-                    <option value="">
-                      {loadingOptions ? 'Loading…' : 'Select Rating'}
-                    </option>
-                    {ratingOptions.map(opt => (
-                      <option key={opt.id} value={opt.label}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label>
-                  Industry
-                  <select
-                    name="industry"
-                    value={form.industry}
-                    onChange={handleChange}
-                  >
-                    <option value="">
-                      {loadingOptions ? 'Loading…' : 'Select Industry'}
-                    </option>
-                    {industryOptions.map(opt => (
-                      <option key={opt.id} value={opt.label}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <div className="section-title">Location</div>
-                <div className="section-divider" />
-
-                {/* Hidden lat/long fields still stored in state & sent to Supabase */}
-                <div style={{ display: 'none' }}>
-                  <input
-                    name="latitude"
-                    value={form.latitude}
-                    onChange={handleChange}
-                  />
-                  <input
-                    name="longitude"
-                    value={form.longitude}
-                    onChange={handleChange}
-                  />
-                </div>
-
-                {locStatus && (
-                  <div
-                    className="helper"
-                    style={{ marginTop: 8, marginBottom: 16 }}
-                  >
-                    {locStatus}
-                  </div>
-                )}
-
+                {/* Scan card button (optional) */}
                 <button
                   type="button"
-                  onClick={handleFindNearbyBusinesses}
+                  onClick={handleScanCard}
                   style={{
                     width: '100%',
-                    marginTop: 8,
-                    marginBottom: 4,
-                    padding: '12px 16px',
+                    marginBottom: 16,
+                    padding: '14px 16px',
+                    fontWeight: 600,
                     borderRadius: 12,
                     border: 'none',
-                    fontWeight: 600,
-                    fontSize: '0.95rem',
-                    background: 'var(--navy-2)',
+                    background: 'var(--navy)',
                     color: 'white',
+                    fontSize: '1rem',
                     boxShadow: 'var(--shadow)',
                   }}
-                  disabled={loadingBusinesses}
                 >
-                  {loadingBusinesses ? 'Searching nearby…' : 'Find Nearby Businesses'}
+                  📷 Scan Business Card (Optional)
                 </button>
 
-                {businessError && (
-                  <div
-                    className="helper"
-                    style={{ marginTop: 4, marginBottom: 8, color: '#b91c1c' }}
-                  >
-                    {businessError}
+                {/* LEAD FORM */}
+                <form onSubmit={handleSubmit}>
+                  <div className="section-title">Contact Info</div>
+                  <div className="section-divider" />
+
+                  <label>
+                    Company (required)
+                    <input
+                      name="company"
+                      placeholder="Company Name"
+                      value={form.company}
+                      onChange={handleChange}
+                    />
+                  </label>
+
+                  <div className="row">
+                    <div>
+                      <label>
+                        Contact Name
+                        <input
+                          name="contact_name"
+                          placeholder="Contact Name"
+                          value={form.contact_name}
+                          onChange={handleChange}
+                        />
+                      </label>
+                    </div>
+                    <div>
+                      <label>
+                        Phone Number
+                        <input
+                          name="phone"
+                          placeholder="(000) 000-0000"
+                          value={form.phone}
+                          onChange={handleChange}
+                        />
+                      </label>
+                    </div>
                   </div>
-                )}
 
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="primary"
-                  style={{ width: '100%', marginTop: 20 }}
-                >
-                  {loading ? 'Saving…' : 'Submit'}
-                </button>
+                  <div className="row">
+                    <div>
+                      <label>
+                        Email Address
+                        <input
+                          name="email"
+                          placeholder="Email Address"
+                          value={form.email}
+                          onChange={handleChange}
+                        />
+                      </label>
+                    </div>
+                  </div>
 
-                {statusMsg === 'success' && (
-                  <p style={{ color: 'green', marginTop: 8 }}>Lead saved ✅</p>
-                )}
-                {statusMsg === 'error' && (
-                  <p style={{ color: 'red', marginTop: 8 }}>
-                    Something went wrong. Check console / Supabase settings.
-                  </p>
-                )}
-              </form>
+                  <div className="section-title">Call Notes</div>
+                  <div className="section-divider" />
 
-              {/* RECENT LEADS */}
-              <div style={{ marginTop: 24 }}>
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    marginBottom: 8,
-                  }}
-                >
-                  <span className="section-title" style={{ marginTop: 0 }}>
-                    Recent Leads
-                  </span>
+                  <label>
+                    Call Note
+                    <textarea
+                      name="note"
+                      placeholder="Note (Required)"
+                      value={form.note}
+                      onChange={handleChange}
+                    />
+                  </label>
+
+                  <div className="section-title">Call Details</div>
+                  <div className="section-divider" />
+
+                  <label>
+                    Call Type / Status
+                    <select
+                      name="status"
+                      value={form.status}
+                      onChange={handleChange}
+                    >
+                      <option value="">
+                        {loadingOptions ? 'Loading…' : 'Select Call Type'}
+                      </option>
+                      {statusOptions.map(opt => (
+                        <option key={opt.id} value={opt.label}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label>
+                    Call Rating
+                    <select
+                      name="rating"
+                      value={form.rating}
+                      onChange={handleChange}
+                    >
+                      <option value="">
+                        {loadingOptions ? 'Loading…' : 'Select Rating'}
+                      </option>
+                      {ratingOptions.map(opt => (
+                        <option key={opt.id} value={opt.label}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label>
+                    Industry
+                    <select
+                      name="industry"
+                      value={form.industry}
+                      onChange={handleChange}
+                    >
+                      <option value="">
+                        {loadingOptions ? 'Loading…' : 'Select Industry'}
+                      </option>
+                      {industryOptions.map(opt => (
+                        <option key={opt.id} value={opt.label}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <div className="section-title">Location</div>
+                  <div className="section-divider" />
+
+                  {/* Hidden lat/long fields still stored in state & sent to Supabase */}
+                  <div style={{ display: 'none' }}>
+                    <input
+                      name="latitude"
+                      value={form.latitude}
+                      onChange={handleChange}
+                    />
+                    <input
+                      name="longitude"
+                      value={form.longitude}
+                      onChange={handleChange}
+                    />
+                  </div>
+
+                  {locStatus && (
+                    <div
+                      className="helper"
+                      style={{ marginTop: 8, marginBottom: 16 }}
+                    >
+                      {locStatus}
+                    </div>
+                  )}
+
                   <button
                     type="button"
-                    onClick={loadLeads}
-                    disabled={loadingLeads}
-                    style={{ fontSize: '0.8rem', padding: '6px 10px' }}
-                  >
-                    {loadingLeads ? 'Refreshing…' : 'Refresh'}
-                  </button>
-                </div>
-
-                {loadingLeads && <p>Loading…</p>}
-
-                {!loadingLeads && leads.length === 0 && (
-                  <p className="helper">
-                    No leads yet. Add your first one above.
-                  </p>
-                )}
-
-                <div
-                  style={{ display: 'flex', flexDirection: 'column', gap: 6 }}
-                >
-                  {leads.map(lead => (
-                    <div key={lead.id} className="lead-card">
-                      <strong>{lead.company}</strong>
-                      {lead.contact_name && <div>{lead.contact_name}</div>}
-                      {(lead.email || lead.phone) && (
-                        <div style={{ opacity: 0.8 }}>
-                          {lead.email && <span>{lead.email}</span>}
-                          {lead.email && lead.phone && <span> · </span>}
-                          {lead.phone && <span>{lead.phone}</span>}
-                        </div>
-                      )}
-                      {(lead.status || lead.rating || lead.industry) && (
-                        <div style={{ marginTop: 4, opacity: 0.9 }}>
-                          {lead.status && <span>Status: {lead.status}</span>}
-                          {lead.status &&
-                            (lead.rating || lead.industry) && <span> · </span>}
-                          {lead.rating && <span>Rating: {lead.rating}</span>}
-                          {lead.rating && lead.industry && <span> · </span>}
-                          {lead.industry && (
-                            <span>Industry: {lead.industry}</span>
-                          )}
-                        </div>
-                      )}
-                      {lead.latitude && lead.longitude && (
-                        <div style={{ marginTop: 4, opacity: 0.7 }}>
-                          📍 {lead.latitude}, {lead.longitude}
-                        </div>
-                      )}
-                      {lead.note && (
-                        <div style={{ marginTop: 4 }}>{lead.note}</div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* BUSINESS PICKER SHEET */}
-              {showBusinessPicker && (
-                <div
-                  style={{
-                    position: 'fixed',
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    top: '30%',
-                    background: 'rgba(15, 23, 42, 0.35)',
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'flex-end',
-                    zIndex: 60,
-                  }}
-                  onClick={() => setShowBusinessPicker(false)}
-                >
-                  <div
+                    onClick={handleFindNearbyBusinesses}
                     style={{
                       width: '100%',
-                      maxWidth: 820,
-                      margin: '0 auto',
-                      background: '#fff',
-                      borderTopLeftRadius: 24,
-                      borderTopRightRadius: 24,
-                      boxShadow: '0 -10px 24px rgba(15,23,42,0.25)',
-                      padding: 16,
-                      maxHeight: '70%',
-                      overflowY: 'auto',
+                      marginTop: 8,
+                      marginBottom: 4,
+                      padding: '12px 16px',
+                      borderRadius: 12,
+                      border: 'none',
+                      fontWeight: 600,
+                      fontSize: '0.95rem',
+                      background: 'var(--navy-2)',
+                      color: 'white',
+                      boxShadow: 'var(--shadow)',
                     }}
-                    onClick={e => e.stopPropagation()}
+                    disabled={loadingBusinesses}
                   >
+                    {loadingBusinesses
+                      ? 'Searching nearby…'
+                      : 'Find Nearby Businesses'}
+                  </button>
+
+                  {businessError && (
                     <div
-                      style={{
-                        width: 40,
-                        height: 4,
-                        borderRadius: 999,
-                        background: '#e5e7eb',
-                        margin: '0 auto 8px',
-                      }}
-                    />
-                    <h2
+                      className="helper"
                       style={{
                         marginTop: 4,
                         marginBottom: 8,
-                        fontSize: '1rem',
+                        color: '#b91c1c',
                       }}
                     >
-                      Nearby Businesses
-                    </h2>
-                    {loadingBusinesses && <p>Searching nearby…</p>}
-                    {!loadingBusinesses && businesses.length === 0 && (
-                      <p className="helper">
-                        {businessError || 'No nearby businesses found.'}
-                      </p>
-                    )}
+                      {businessError}
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="primary"
+                    style={{ width: '100%', marginTop: 20 }}
+                  >
+                    {loading ? 'Saving…' : 'Submit'}
+                  </button>
+
+                  {statusMsg === 'success' && (
+                    <p style={{ color: 'green', marginTop: 8 }}>
+                      Lead saved ✅
+                    </p>
+                  )}
+                  {statusMsg === 'error' && (
+                    <p style={{ color: 'red', marginTop: 8 }}>
+                      Something went wrong. Check console / Supabase settings.
+                    </p>
+                  )}
+                </form>
+
+                {/* RECENT LEADS */}
+                <div style={{ marginTop: 24 }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginBottom: 8,
+                    }}
+                  >
+                    <span className="section-title" style={{ marginTop: 0 }}>
+                      Recent Leads
+                    </span>
+                    <button
+                      type="button"
+                      onClick={loadLeads}
+                      disabled={loadingLeads}
+                      style={{ fontSize: '0.8rem', padding: '6px 10px' }}
+                    >
+                      {loadingLeads ? 'Refreshing…' : 'Refresh'}
+                    </button>
+                  </div>
+
+                  {loadingLeads && <p>Loading…</p>}
+
+                  {!loadingLeads && leads.length === 0 && (
+                    <p className="helper">
+                      No leads yet. Add your first one above.
+                    </p>
+                  )}
+
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 6,
+                    }}
+                  >
+                    {leads.map(lead => (
+                      <div key={lead.id} className="lead-card">
+                        <strong>{lead.company}</strong>
+                        {lead.contact_name && <div>{lead.contact_name}</div>}
+                        {(lead.email || lead.phone) && (
+                          <div style={{ opacity: 0.8 }}>
+                            {lead.email && <span>{lead.email}</span>}
+                            {lead.email && lead.phone && <span> · </span>}
+                            {lead.phone && <span>{lead.phone}</span>}
+                          </div>
+                        )}
+                        {(lead.status ||
+                          lead.rating ||
+                          lead.industry) && (
+                          <div style={{ marginTop: 4, opacity: 0.9 }}>
+                            {lead.status && (
+                              <span>Status: {lead.status}</span>
+                            )}
+                            {lead.status &&
+                              (lead.rating || lead.industry) && (
+                                <span> · </span>
+                              )}
+                            {lead.rating && (
+                              <span>Rating: {lead.rating}</span>
+                            )}
+                            {lead.rating && lead.industry && (
+                              <span> · </span>
+                            )}
+                            {lead.industry && (
+                              <span>Industry: {lead.industry}</span>
+                            )}
+                          </div>
+                        )}
+                        {lead.latitude && lead.longitude && (
+                          <div style={{ marginTop: 4, opacity: 0.7 }}>
+                            📍 {lead.latitude}, {lead.longitude}
+                          </div>
+                        )}
+                        {lead.note && (
+                          <div style={{ marginTop: 4 }}>{lead.note}</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* BUSINESS PICKER SHEET */}
+                {showBusinessPicker && (
+                  <div
+                    style={{
+                      position: 'fixed',
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      top: '30%',
+                      background: 'rgba(15, 23, 42, 0.35)',
+                      display: 'flex',
+                      justifyContent: 'center',
+                      alignItems: 'flex-end',
+                      zIndex: 60,
+                    }}
+                    onClick={() => setShowBusinessPicker(false)}
+                  >
                     <div
                       style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: 8,
-                        marginTop: 4,
+                        width: '100%',
+                        maxWidth: 820,
+                        margin: '0 auto',
+                        background: '#fff',
+                        borderTopLeftRadius: 24,
+                        borderTopRightRadius: 24,
+                        boxShadow: '0 -10px 24px rgba(15,23,42,0.25)',
+                        padding: 16,
+                        maxHeight: '70%',
+                        overflowY: 'auto',
                       }}
+                      onClick={e => e.stopPropagation()}
                     >
-                      {businesses.map(biz => (
-                        <button
-                          key={biz.place_id}
-                          type="button"
-                          onClick={() => setSelectedBusiness(biz)}
-                          style={{
-                            textAlign: 'left',
-                            padding: 10,
-                            borderRadius: 12,
-                            border: '1px solid var(--border)',
-                            background:
-                              selectedBusiness &&
-                              selectedBusiness.place_id === biz.place_id
-                                ? '#e5f0ff'
-                                : '#f9fafb',
-                            boxShadow: 'none',
-                            minHeight: 0,
-                            fontSize: '0.9rem',
-                            color: 'var(--ink)', // force dark text
-                          }}
-                        >
-                          <div style={{ fontWeight: 700 }}>
-                            {biz.name || biz.address}
-                          </div>
-                          {biz.address && (
-                            <div
-                              style={{
-                                fontSize: '0.8rem',
-                                color: '#4b5563',
-                                marginTop: 2,
-                              }}
-                            >
-                              {biz.address}
-                            </div>
-                          )}
-                        </button>
-                      ))}
-
-                      {selectedBusiness && (
-                        <div
-                          style={{
-                            marginTop: 12,
-                            paddingTop: 8,
-                            borderTop: '1px solid #e5e7eb',
-                          }}
-                        >
-                          {/* Name + address */}
-                          <div
+                      <div
+                        style={{
+                          width: 40,
+                          height: 4,
+                          borderRadius: 999,
+                          background: '#e5e7eb',
+                          margin: '0 auto 8px',
+                        }}
+                      />
+                      <h2
+                        style={{
+                          marginTop: 4,
+                          marginBottom: 8,
+                          fontSize: '1rem',
+                        }}
+                      >
+                        Nearby Businesses
+                      </h2>
+                      {loadingBusinesses && <p>Searching nearby…</p>}
+                      {!loadingBusinesses && businesses.length === 0 && (
+                        <p className="helper">
+                          {businessError || 'No nearby businesses found.'}
+                        </p>
+                      )}
+                      <div
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 8,
+                          marginTop: 4,
+                        }}
+                      >
+                        {businesses.map(biz => (
+                          <button
+                            key={biz.place_id}
+                            type="button"
+                            onClick={() => setSelectedBusiness(biz)}
                             style={{
-                              fontWeight: 800,
-                              fontSize: '0.95rem',
+                              textAlign: 'left',
+                              padding: 10,
+                              borderRadius: 12,
+                              border: '1px solid var(--border)',
+                              background:
+                                selectedBusiness &&
+                                selectedBusiness.place_id === biz.place_id
+                                  ? '#e5f0ff'
+                                  : '#f9fafb',
+                              boxShadow: 'none',
+                              minHeight: 0,
+                              fontSize: '0.9rem',
+                              color: 'var(--ink)', // force dark text
                             }}
                           >
-                            {selectedBusiness.name ||
-                              selectedBusiness.address}
-                          </div>
-                          {selectedBusiness.address && (
+                            <div style={{ fontWeight: 700 }}>
+                              {biz.name || biz.address}
+                            </div>
+                            {biz.address && (
+                              <div
+                                style={{
+                                  fontSize: '0.8rem',
+                                  color: '#4b5563',
+                                  marginTop: 2,
+                                }}
+                              >
+                                {biz.address}
+                              </div>
+                            )}
+                          </button>
+                        ))}
+
+                        {selectedBusiness && (
+                          <div
+                            style={{
+                              marginTop: 12,
+                              paddingTop: 8,
+                              borderTop: '1px solid #e5e7eb',
+                            }}
+                          >
+                            {/* Name + address */}
                             <div
                               style={{
-                                fontSize: '0.85rem',
-                                color: '#4b5563',
-                                marginTop: 2,
+                                fontWeight: 800,
+                                fontSize: '0.95rem',
                               }}
                             >
-                              {selectedBusiness.address}
+                              {selectedBusiness.name ||
+                                selectedBusiness.address}
                             </div>
-                          )}
-
-                          {/* Rating / type / hours */}
-                          {(selectedBusiness.rating ||
-                            categoryLabel ||
-                            typeof selectedBusiness.openNow === 'boolean') && (
-                            <div
-                              style={{
-                                fontSize: '0.8rem',
-                                color: '#4b5563',
-                                marginTop: 4,
-                              }}
-                            >
-                              {selectedBusiness.rating && (
-                                <span>
-                                  ⭐ {selectedBusiness.rating.toFixed(1)}
-                                  {selectedBusiness.ratingCount
-                                    ? ` (${selectedBusiness.ratingCount})`
-                                    : ''}
-                                </span>
-                              )}
-                              {selectedBusiness.rating &&
-                                (categoryLabel ||
-                                  typeof selectedBusiness.openNow ===
-                                    'boolean') && <span>{' • '}</span>}
-                              {categoryLabel && (
-                                <span>{categoryLabel}</span>
-                              )}
-                              {categoryLabel &&
-                                typeof selectedBusiness.openNow ===
-                                  'boolean' && <span>{' • '}</span>}
-                              {typeof selectedBusiness.openNow ===
-                                'boolean' && (
-                                <span>
-                                  {selectedBusiness.openNow
-                                    ? 'Open now'
-                                    : 'Closed now'}
-                                </span>
-                              )}
-                            </div>
-                          )}
-
-                          {/* Phone / website */}
-                          {(selectedBusiness.phone ||
-                            selectedBusiness.website) && (
-                            <div
-                              style={{
-                                fontSize: '0.8rem',
-                                color: '#4b5563',
-                                marginTop: 4,
-                              }}
-                            >
-                              {selectedBusiness.phone && (
-                                <span>{selectedBusiness.phone}</span>
-                              )}
-                              {selectedBusiness.phone &&
-                                selectedBusiness.website && (
-                                  <span>{' • '}</span>
-                                )}
-                              {selectedBusiness.website && (
-                                <span>
-                                  {selectedBusiness.website.replace(
-                                    /^https?:\/\//,
-                                    ''
-                                  )}
-                                </span>
-                              )}
-                            </div>
-                          )}
-
-                          {/* Mini map */}
-                          {selectedBusiness.lat &&
-                            selectedBusiness.lng &&
-                            import.meta.env.VITE_GOOGLE_MAPS_BROWSER_KEY && (
-                              <div style={{ marginTop: 8 }}>
-                                <img
-                                  src={`https://maps.googleapis.com/maps/api/staticmap?center=${selectedBusiness.lat},${selectedBusiness.lng}&zoom=15&size=600x250&markers=color:red|${selectedBusiness.lat},${selectedBusiness.lng}&key=${
-                                    import.meta.env
-                                      .VITE_GOOGLE_MAPS_BROWSER_KEY
-                                  }`}
-                                  alt="Map preview"
-                                  style={{ width: '100%', borderRadius: 12 }}
-                                />
+                            {selectedBusiness.address && (
+                              <div
+                                style={{
+                                  fontSize: '0.85rem',
+                                  color: '#4b5563',
+                                  marginTop: 2,
+                                }}
+                              >
+                                {selectedBusiness.address}
                               </div>
                             )}
 
-                          {/* Use this business button */}
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleSelectBusiness(selectedBusiness)
-                            }
-                            style={{
-                              width: '100%',
-                              marginTop: 10,
-                              minHeight: 40,
-                              fontSize: '0.9rem',
-                              fontWeight: 600,
-                              borderRadius: 999,
-                              border: 'none',
-                              background: 'var(--navy)',
-                              color: '#fff',
-                              boxShadow: 'var(--shadow)',
-                            }}
-                          >
-                            Use this business
-                          </button>
-                        </div>
-                      )}
-                    </div>
+                            {/* Rating / type / hours */}
+                            {(selectedBusiness.rating ||
+                              categoryLabel ||
+                              typeof selectedBusiness.openNow ===
+                                'boolean') && (
+                              <div
+                                style={{
+                                  fontSize: '0.8rem',
+                                  color: '#4b5563',
+                                  marginTop: 4,
+                                }}
+                              >
+                                {selectedBusiness.rating && (
+                                  <span>
+                                    ⭐ {selectedBusiness.rating.toFixed(1)}
+                                    {selectedBusiness.ratingCount
+                                      ? ` (${selectedBusiness.ratingCount})`
+                                      : ''}
+                                  </span>
+                                )}
+                                {selectedBusiness.rating &&
+                                  (categoryLabel ||
+                                    typeof selectedBusiness.openNow ===
+                                      'boolean') && <span>{' • '}</span>}
+                                {categoryLabel && (
+                                  <span>{categoryLabel}</span>
+                                )}
+                                {categoryLabel &&
+                                  typeof selectedBusiness.openNow ===
+                                    'boolean' && <span>{' • '}</span>}
+                                {typeof selectedBusiness.openNow ===
+                                  'boolean' && (
+                                  <span>
+                                    {selectedBusiness.openNow
+                                      ? 'Open now'
+                                      : 'Closed now'}
+                                  </span>
+                                )}
+                              </div>
+                            )}
 
-                    <button
-                      type="button"
-                      onClick={() => setShowBusinessPicker(false)}
-                      style={{
-                        width: '100%',
-                        marginTop: 12,
-                        minHeight: 40,
-                        fontSize: '0.9rem',
-                      }}
-                    >
-                      Close
-                    </button>
+                            {/* Phone / website */}
+                            {(selectedBusiness.phone ||
+                              selectedBusiness.website) && (
+                              <div
+                                style={{
+                                  fontSize: '0.8rem',
+                                  color: '#4b5563',
+                                  marginTop: 4,
+                                }}
+                              >
+                                {selectedBusiness.phone && (
+                                  <span>{selectedBusiness.phone}</span>
+                                )}
+                                {selectedBusiness.phone &&
+                                  selectedBusiness.website && (
+                                    <span>{' • '}</span>
+                                  )}
+                                {selectedBusiness.website && (
+                                  <span>
+                                    {selectedBusiness.website.replace(
+                                      /^https?:\/\//,
+                                      ''
+                                    )}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Mini map */}
+                            {selectedBusiness.lat &&
+                              selectedBusiness.lng &&
+                              import.meta.env
+                                .VITE_GOOGLE_MAPS_BROWSER_KEY && (
+                                <div style={{ marginTop: 8 }}>
+                                  <img
+                                    src={`https://maps.googleapis.com/maps/api/staticmap?center=${selectedBusiness.lat},${selectedBusiness.lng}&zoom=15&size=600x250&markers=color:red|${selectedBusiness.lat},${selectedBusiness.lng}&key=${
+                                      import.meta.env
+                                        .VITE_GOOGLE_MAPS_BROWSER_KEY
+                                    }`}
+                                    alt="Map preview"
+                                    style={{ width: '100%', borderRadius: 12 }}
+                                  />
+                                </div>
+                              )}
+
+                            {/* Use this business button */}
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleSelectBusiness(selectedBusiness)
+                              }
+                              style={{
+                                width: '100%',
+                                marginTop: 10,
+                                minHeight: 40,
+                                fontSize: '0.9rem',
+                                fontWeight: 600,
+                                borderRadius: 999,
+                                border: 'none',
+                                background: 'var(--navy)',
+                                color: '#fff',
+                                boxShadow: 'var(--shadow)',
+                              }}
+                            >
+                              Use this business
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setShowBusinessPicker(false)}
+                        style={{
+                          width: '100%',
+                          marginTop: 12,
+                          minHeight: 40,
+                          fontSize: '0.9rem',
+                        }}
+                      >
+                        Close
+                      </button>
+                    </div>
                   </div>
-                </div>
-              )}
-            </>
-          ) : (
-            <AdminOptions
-              organizationId={ORGANIZATION_ID}
-              statusOptions={statusOptions}
-              ratingOptions={ratingOptions}
-              industryOptions={industryOptions}
-              reloadOptions={loadOptionLists}
-            />
-          )}
-        </div>
+                )}
+              </>
+            ) : (
+              <AdminOptions
+                organizationId={ORGANIZATION_ID}
+                statusOptions={statusOptions}
+                ratingOptions={ratingOptions}
+                industryOptions={industryOptions}
+                reloadOptions={loadOptionLists}
+              />
+            )}
+          </div>
+        )}
       </main>
     </>
   )
