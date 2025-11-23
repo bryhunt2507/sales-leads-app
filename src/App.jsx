@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
 import AdminOptions from './AdminOptions.jsx'
 import MainHome from './MainHome.jsx'
- // <-- named import
 
 async function fileToBase64(file) {
   return new Promise((resolve, reject) => {
@@ -31,7 +30,6 @@ function App() {
   // 'home' | 'entry' | 'admin'
   const [view, setView] = useState('home')
   const [selectedBusiness, setSelectedBusiness] = useState(null)
-
 
   // OCR endpoint
   const CARD_OCR_ENDPOINT = '/api/ocr'
@@ -78,129 +76,132 @@ function App() {
         : selectedBusiness.category.text || ''
       : ''
 
-
-async function handleSendMagicLink(email) {
-  try {
-    const { error } = await supabase.auth.signInWithOtp({
-      email: email,
-    })
-
-    if (error) {
-      alert("Error sending sign-in link: " + error.message)
-    } else {
-      alert("Sign-in link sent to " + email)
-    }
-  } catch (err) {
-    console.error(err)
-    alert("Something went wrong.")
-  }
-}
-
-
-        // Load current auth user & profile (company/org/role)
+  // ------------------------
+  // Auth: load user + profile + org once, and on auth changes
+  // ------------------------
   useEffect(() => {
-    async function loadProfile() {
+    let isMounted = true
+
+    async function syncFromUser(user) {
+      if (!isMounted) return
+
+      setAuthUser(user ?? null)
+
+      if (!user?.email) {
+        setProfile(null)
+        setOrganizationId(DEFAULT_ORGANIZATION_ID)
+        return
+      }
+
       try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser()
-
-        if (!user || !user.email) {
-          setAuthLoading(false)
-          return
-        }
-
-        const { data: prof, error } = await supabase
+        const { data: profileRow, error } = await supabase
           .from('profiles')
           .select('*')
           .eq('email', user.email)
-          .single()
+          .maybeSingle()
 
-        if (!error && prof) {
-          setProfile(prof)
-          if (prof.organization_id) {
-            setOrganizationId(prof.organization_id)
-          }
+        if (error) {
+          console.error('Error loading profile', error)
+        }
+
+        if (profileRow) {
+          setProfile(profileRow)
+          setOrganizationId(
+            profileRow.organization_id || DEFAULT_ORGANIZATION_ID
+          )
         } else {
-          console.log('No profile row for user yet', error)
+          // Optionally create a default profile
+          const { data: newProfile, error: insertError } = await supabase
+            .from('profiles')
+            .insert({
+              email: user.email,
+              role: 'user',
+              organization_id: DEFAULT_ORGANIZATION_ID,
+            })
+            .select()
+            .maybeSingle()
+
+          if (insertError) {
+            console.error('Error creating default profile', insertError)
+            setProfile(null)
+            setOrganizationId(DEFAULT_ORGANIZATION_ID)
+          } else if (newProfile) {
+            setProfile(newProfile)
+            setOrganizationId(
+              newProfile.organization_id || DEFAULT_ORGANIZATION_ID
+            )
+          }
         }
       } catch (err) {
-        console.error('Error loading auth profile', err)
-      } finally {
-        setAuthLoading(false)
+        console.error('Error syncing auth/profile', err)
+        setProfile(null)
+        setOrganizationId(DEFAULT_ORGANIZATION_ID)
       }
     }
 
-    loadProfile()
-  }, [])
-
-    // Load current auth user and listen for changes (Google login)
-  useEffect(() => {
-    async function loadUser() {
+    async function init() {
       try {
         setAuthLoading(true)
-        const { data, error } = await supabase.auth.getUser()
-        if (error) {
-          console.error('Error loading auth user:', error)
-          setAuthUser(null)
-        } else {
-          setAuthUser(data?.user ?? null)
-        }
+        const {
+          data: { user },
+        } = await supabase.auth.getUser()
+        await syncFromUser(user ?? null)
       } catch (err) {
-        console.error('Error loading auth user:', err)
-        setAuthUser(null)
+        console.error('Error loading auth user', err)
       } finally {
-        setAuthLoading(false)
+        if (isMounted) setAuthLoading(false)
       }
     }
 
-    loadUser()
+    init()
 
     const { data: subscription } = supabase.auth.onAuthStateChange(
       (_event, session) => {
-        setAuthUser(session?.user ?? null)
+        syncFromUser(session?.user ?? null)
       }
     )
 
     return () => {
+      isMounted = false
       subscription?.subscription?.unsubscribe()
     }
   }, [])
 
   // Start Google OAuth login
   async function handleProviderLogin() {
-  try {
-    const redirectUrl =
-      typeof window !== 'undefined' ? window.location.origin : undefined
+    try {
+      const redirectUrl =
+        typeof window !== 'undefined' ? window.location.origin : undefined
 
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: redirectUrl,
-      },
-    })
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectUrl,
+        },
+      })
 
-    if (error) {
-      console.error('OAuth error', error)
-      alert('Error starting Google sign-in: ' + error.message)
+      if (error) {
+        console.error('OAuth error', error)
+        alert('Error starting Google sign-in: ' + error.message)
+      }
+    } catch (err) {
+      console.error('OAuth error', err)
+      alert('Error starting Google sign-in.')
     }
-  } catch (err) {
-    console.error('OAuth error', err)
-    alert('Error starting Google sign-in.')
   }
-}
 
   // Log out
   async function handleLogout() {
     try {
       await supabase.auth.signOut()
       setAuthUser(null)
+      setProfile(null)
+      setOrganizationId(DEFAULT_ORGANIZATION_ID)
       window.location.reload()
     } catch (err) {
       console.error('Logout error', err)
     }
   }
-
 
   function handleChange(e) {
     const { name, value } = e.target
@@ -265,36 +266,7 @@ async function handleSendMagicLink(email) {
     }
   }
 
-  // Listen for login/logout events
-useEffect(() => {
-  const { data: listener } = supabase.auth.onAuthStateChange(
-    async (event, session) => {
-      if (session?.user?.email) {
-        // Re-load profile after login
-        const { data: prof } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('email', session.user.email)
-          .single()
-
-        setProfile(prof || null)
-        if (prof?.organization_id) {
-          setOrganizationId(prof.organization_id)
-        }
-      } else {
-        setProfile(null)
-        setOrganizationId(DEFAULT_ORGANIZATION_ID)
-      }
-    }
-  )
-
-  return () => {
-    listener.subscription.unsubscribe()
-  }
-}, [])
-
-  // Load dropdown options from Supabase
-    // Load dropdown options for the current organization
+  // Load dropdown options for the current organization
   async function loadOptionLists() {
     if (!organizationId) return
     setLoadingOptions(true)
@@ -353,168 +325,7 @@ useEffect(() => {
     setLoadingLeads(false)
   }
 
-
-    if (organizationId) {
-      query = query.eq('organization_id', organizationId)
-    }
-
-    const { data, error } = await query
-
-
-    if (error) {
-      console.error('Error loading leads:', error)
-    } else {
-      setLeads(data || [])
-    }
-    setLoadingLeads(false)
-  }
   // Get GPS location once
-  useEffect(() => {
-    autoGetLocation()
-  }, [])
-
-    // Load current auth user + profile + organization
-  useEffect(() => {
-    let isMounted = true
-
-    async function initAuth() {
-      try {
-        // 1) Get current auth user (Google account)
-        const {
-          data: { user },
-        } = await supabase.auth.getUser()
-
-        if (!isMounted) return
-
-        setAuthUser(user || null)
-
-        if (user?.email) {
-          // 2) Look up profile by email
-          const { data: profileRow, error: profileError } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('email', user.email)
-            .maybeSingle()
-
-          if (profileError) {
-            console.error('Error loading profile', profileError)
-          }
-
-          if (profileRow) {
-            setProfile(profileRow)
-
-            // 3) Drive organization from profile
-            if (profileRow.organization_id) {
-              setOrganizationId(profileRow.organization_id)
-            }
-          } else {
-            // Optional: create a default profile if one does not exist yet
-            const { data: newProfile, error: insertError } = await supabase
-              .from('profiles')
-              .insert({
-                email: user.email,
-                role: 'user',
-                organization_id: DEFAULT_ORGANIZATION_ID,
-              })
-              .select()
-              .maybeSingle()
-
-            if (!insertError && newProfile && isMounted) {
-              setProfile(newProfile)
-              setOrganizationId(
-                newProfile.organization_id || DEFAULT_ORGANIZATION_ID
-              )
-            } else if (insertError) {
-              console.error('Error creating default profile', insertError)
-            }
-          }
-        }
-      } catch (err) {
-        console.error('Error initializing auth/profile', err)
-      } finally {
-        if (isMounted) setAuthLoading(false)
-      }
-    }
-
-    initAuth()
-
-    return () => {
-      isMounted = false
-    }
-  }, [])
-
-  // Load org-scoped data once we know the org
-    // Get device location once on mount
-  useEffect(() => {
-    autoGetLocation()
-  }, [])
-
-  // Whenever organizationId changes, load org-specific data
-  useEffect(() => {
-    if (!organizationId) return
-    loadLeads()
-    loadOptionLists()
-  }, [organizationId])
-
-
-
-  async function handleSubmit(e) {
-    e.preventDefault()
-    setLoading(true)
-    setStatusMsg(null)
-
-    if (!form.company && !form.contact_name) {
-      setStatusMsg('error')
-      setLoading(false)
-      return
-    }
-
-    const { data, error } = await supabase
-      .from('leads')
-            .insert([
-        {
-          organization_id: organizationId || DEFAULT_ORGANIZATION_ID,
-          company: form.company,
-          contact_name: form.contact_name,
-          email: form.email,
-          phone: form.phone,
-          note: form.note,
-          status: form.status,
-          rating: form.rating,
-          industry: form.industry,
-          latitude: form.latitude ? Number(form.latitude) : null,
-          longitude: form.longitude ? Number(form.longitude) : null,
-          location_source: form.latitude && form.longitude ? 'gps' : null,
-        },
-      ])
-      .select()
-
-    if (error) {
-      console.error(error)
-      setStatusMsg('error')
-    } else {
-      setStatusMsg('success')
-      setForm({
-        company: '',
-        contact_name: '',
-        email: '',
-        phone: '',
-        note: '',
-        status: '',
-        rating: '',
-        industry: '',
-        latitude: '',
-        longitude: '',
-      })
-
-      if (data && data.length > 0) {
-        setLeads(prev => [data[0], ...prev].slice(0, 20))
-      }
-    }
-
-    setLoading(false)
-  }
-
   function autoGetLocation() {
     if (!navigator.geolocation) {
       setLocStatus('Geolocation not supported on this device.')
@@ -545,6 +356,18 @@ useEffect(() => {
       }
     )
   }
+
+  // Device location on mount
+  useEffect(() => {
+    autoGetLocation()
+  }, [])
+
+  // Whenever organizationId changes, load org-specific data
+  useEffect(() => {
+    if (!organizationId) return
+    loadLeads()
+    loadOptionLists()
+  }, [organizationId])
 
   // Nearby business handler
   async function handleFindNearbyBusinesses() {
@@ -662,13 +485,69 @@ useEffect(() => {
     setShowBusinessPicker(false)
   }
 
-    const isAdmin =
-    profile?.role === 'owner' || profile?.role === 'admin'
+  const isAdmin = profile?.role === 'owner' || profile?.role === 'admin'
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    setLoading(true)
+    setStatusMsg(null)
+
+    if (!form.company && !form.contact_name) {
+      setStatusMsg('error')
+      setLoading(false)
+      return
+    }
+
+    const { data, error } = await supabase
+      .from('leads')
+      .insert([
+        {
+          organization_id: organizationId || DEFAULT_ORGANIZATION_ID,
+          company: form.company,
+          contact_name: form.contact_name,
+          email: form.email,
+          phone: form.phone,
+          note: form.note,
+          status: form.status,
+          rating: form.rating,
+          industry: form.industry,
+          latitude: form.latitude ? Number(form.latitude) : null,
+          longitude: form.longitude ? Number(form.longitude) : null,
+          location_source: form.latitude && form.longitude ? 'gps' : null,
+        },
+      ])
+      .select()
+
+    if (error) {
+      console.error(error)
+      setStatusMsg('error')
+    } else {
+      setStatusMsg('success')
+      setForm({
+        company: '',
+        contact_name: '',
+        email: '',
+        phone: '',
+        note: '',
+        status: '',
+        rating: '',
+        industry: '',
+        latitude: '',
+        longitude: '',
+      })
+
+      if (data && data.length > 0) {
+        setLeads(prev => [data[0], ...prev].slice(0, 20))
+      }
+    }
+
+    setLoading(false)
+  }
 
   return (
     <>
       {/* Top nav/header */}
-                 <header>
+      <header>
         <div className="header-inner">
           <div className="brand">
             <div className="brand-logo" />
@@ -716,7 +595,7 @@ useEffect(() => {
                 Admin
               </button>
             )}
-                       <div
+            <div
               className="user-badge"
               style={{ display: 'flex', gap: 8, alignItems: 'center' }}
             >
@@ -759,33 +638,11 @@ useEffect(() => {
                 </button>
               )}
             </div>
-
-  {profile?.email ? (
-    profile.email
-  ) : (
-    <button
-      type="button"
-      onClick={() => {
-        const email = prompt("Enter your work email address:")
-        if (email) handleSendMagicLink(email)
-      }}
-      style={{
-        background: 'transparent',
-        border: 'none',
-        color: 'white',
-        cursor: 'pointer',
-        fontSize: '0.9rem',
-      }}
-    >
-      Not signed in
-    </button>
-  )}
-</div>
-    
+          </div>
         </div>
       </header>
 
-            <main>
+      <main>
         {view === 'home' ? (
           <MainHome />
         ) : (
