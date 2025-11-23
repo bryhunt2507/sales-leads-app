@@ -765,7 +765,7 @@ if (bizList.length === 0) {
                         marginTop: 4,
                       }}
                     >
-                      {businesses.map(biz => (
+{businesses.map(biz => (
   <button
     key={biz.place_id}
     type="button"
@@ -782,6 +782,7 @@ if (bizList.length === 0) {
       boxShadow: 'none',
       minHeight: 0,
       fontSize: '0.9rem',
+      color: 'var(--ink)',           // ✅ force dark text
     }}
   >
     <div style={{ fontWeight: 700 }}>
@@ -800,6 +801,130 @@ if (bizList.length === 0) {
     )}
   </button>
 ))}
+
+{selectedBusiness && (
+  <div
+    style={{
+      marginTop: 12,
+      paddingTop: 8,
+      borderTop: '1px solid #e5e7eb',
+    }}
+  >
+    {/* Name + address */}
+    <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>
+      {selectedBusiness.name || selectedBusiness.address}
+    </div>
+    {selectedBusiness.address && (
+      <div
+        style={{
+          fontSize: '0.85rem',
+          color: '#4b5563',
+          marginTop: 2,
+        }}
+      >
+        {selectedBusiness.address}
+      </div>
+    )}
+
+    {/* Rating / type / hours */}
+    {(selectedBusiness.rating ||
+      selectedBusiness.category ||
+      typeof selectedBusiness.openNow === 'boolean') && (
+      <div
+        style={{
+          fontSize: '0.8rem',
+          color: '#4b5563',
+          marginTop: 4,
+        }}
+      >
+        {selectedBusiness.rating && (
+          <span>
+            ⭐ {selectedBusiness.rating.toFixed(1)}
+            {selectedBusiness.ratingCount
+              ? ` (${selectedBusiness.ratingCount})`
+              : ''}
+          </span>
+        )}
+        {selectedBusiness.rating &&
+          (selectedBusiness.category ||
+            typeof selectedBusiness.openNow === 'boolean') && (
+            <span>{' • '}</span>
+          )}
+        {selectedBusiness.category && (
+          <span>{selectedBusiness.category}</span>
+        )}
+        {selectedBusiness.category &&
+          typeof selectedBusiness.openNow === 'boolean' && (
+            <span>{' • '}</span>
+          )}
+        {typeof selectedBusiness.openNow === 'boolean' && (
+          <span>
+            {selectedBusiness.openNow ? 'Open now' : 'Closed now'}
+          </span>
+        )}
+      </div>
+    )}
+
+    {/* Phone / website */}
+    {(selectedBusiness.phone || selectedBusiness.website) && (
+      <div
+        style={{
+          fontSize: '0.8rem',
+          color: '#4b5563',
+          marginTop: 4,
+        }}
+      >
+        {selectedBusiness.phone && (
+          <span>{selectedBusiness.phone}</span>
+        )}
+        {selectedBusiness.phone && selectedBusiness.website && (
+          <span>{' • '}</span>
+        )}
+        {selectedBusiness.website && (
+          <span>
+            {selectedBusiness.website.replace(/^https?:\/\//, '')}
+          </span>
+        )}
+      </div>
+    )}
+
+    {/* Mini map */}
+    {selectedBusiness.lat &&
+      selectedBusiness.lng &&
+      import.meta.env.VITE_GOOGLE_MAPS_BROWSER_KEY && (
+        <div style={{ marginTop: 8 }}>
+          <img
+            src={`https://maps.googleapis.com/maps/api/staticmap?center=${selectedBusiness.lat},${selectedBusiness.lng}&zoom=15&size=600x250&markers=color:red|${selectedBusiness.lat},${selectedBusiness.lng}&key=${
+              import.meta.env.VITE_GOOGLE_MAPS_BROWSER_KEY
+            }`}
+            alt="Map preview"
+            style={{ width: '100%', borderRadius: 12 }}
+          />
+        </div>
+      )}
+
+    {/* Use this business button */}
+    <button
+      type="button"
+      onClick={() => handleSelectBusiness(selectedBusiness)}
+      style={{
+        width: '100%',
+        marginTop: 10,
+        minHeight: 40,
+        fontSize: '0.9rem',
+        fontWeight: 600,
+        borderRadius: 999,
+        border: 'none',
+        background: 'var(--navy)',
+        color: '#fff',
+        boxShadow: 'var(--shadow)',
+      }}
+    >
+      Use this business
+    </button>
+  </div>
+)}
+
 {selectedBusiness && (
   <div
     style={{
