@@ -14,6 +14,10 @@ function AdminOptions({
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState(null)
 
+  // Create user states
+  const [newUserEmail, setNewUserEmail] = useState('')
+  const [newUserRole, setNewUserRole] = useState('user')
+
   // For inline editing
   const [editing, setEditing] = useState({
     type: null, // 'status' | 'rating' | 'industry'
@@ -148,6 +152,49 @@ function AdminOptions({
     } else {
       clearFn('')
       setMessage('Option added.')
+      reloadOptions && reloadOptions()
+    }
+
+    setSaving(false)
+  }
+
+  // Create user and send magic sign-in link (passwordless)
+  async function createUserAndSendLink() {
+    if (!newUserEmail || !newUserEmail.includes('@')) {
+      setMessage('Please enter a valid email address.')
+      return
+    }
+
+    setSaving(true)
+    setMessage(null)
+
+    // Send magic link / OTP to email
+    const { data, error: authError } = await supabase.auth.signInWithOtp({
+      email: newUserEmail,
+    })
+
+    // Upsert profile with role (will create or update a profiles row keyed by email)
+    const { error: profileError } = await supabase.from('profiles').upsert(
+      [
+        {
+          email: newUserEmail,
+          role: newUserRole,
+          organization_id: organizationId,
+        },
+      ],
+      { returning: 'minimal' }
+    )
+
+    if (authError) {
+      console.error(authError)
+      setMessage('Error sending sign-in link: ' + authError.message)
+    } else if (profileError) {
+      console.error(profileError)
+      setMessage('Sign-in link sent, but error saving profile.')
+    } else {
+      setMessage('Sign-in link sent. User profile saved.')
+      setNewUserEmail('')
+      setNewUserRole('user')
       reloadOptions && reloadOptions()
     }
 
@@ -337,6 +384,30 @@ function AdminOptions({
         newIndustry,
         setNewIndustry
       )}
+
+      <div style={{ marginTop: 32 }}>
+        <div className="section-title">Create User & Send Sign-in Link</div>
+        <div className="section-divider" />
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
+          <input
+            placeholder="user@example.com"
+            value={newUserEmail}
+            onChange={e => setNewUserEmail(e.target.value)}
+            style={{ flex: 1 }}
+          />
+          <select value={newUserRole} onChange={e => setNewUserRole(e.target.value)}>
+            <option value="user">User</option>
+            <option value="admin">Admin</option>
+          </select>
+          <button type="button" disabled={saving} onClick={createUserAndSendLink}>
+            Create & Send Link
+          </button>
+        </div>
+        <p className="helper" style={{ marginTop: 8 }}>
+          This will send a passwordless sign-in link to the email and save the
+          selected role in the `profiles` table.
+        </p>
+      </div>
 
       {message && (
         <p style={{ marginTop: 12, fontSize: '0.9rem' }}>{message}</p>
