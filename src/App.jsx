@@ -406,7 +406,7 @@ function App() {
             <div className="brand-logo" />
             <span>CRM Staffing Sales</span>
           </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}">
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <button
               type="button"
               onClick={() => setView('home')}
