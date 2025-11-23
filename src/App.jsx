@@ -23,7 +23,7 @@ function App() {
   const [view, setView] = useState('entry')
 
   // TODO: point this to your real OCR backend / Apps Script web app
-const CARD_OCR_ENDPOINT = 'https://YOUR-CARD-OCR-ENDPOINT-HERE'
+const CARD_OCR_ENDPOINT = '/api/ocr'
 
 async function handleScanCard() {
   try {
