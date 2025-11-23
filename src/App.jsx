@@ -22,69 +22,8 @@ function App() {
   // Which view are we on? 'entry' or 'admin'
   const [view, setView] = useState('entry')
 
-  // TODO: point this to your real OCR backend / Apps Script web app
-const CARD_OCR_ENDPOINT = '/api/ocr'
-
-async function handleScanCard() {
-  try {
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = 'image/*'
-    input.capture = 'environment' // prefer rear camera on mobile
-
-    input.onchange = async () => {
-      const file = input.files?.[0]
-      if (!file) return
-
-      setStatusMsg(null)
-      setLocStatus('Processing card photo…')
-
-      try {
-        const base64 = await fileToBase64(file)
-
-        // 🔗 Send image to your OCR backend
-        const res = await fetch(CARD_OCR_ENDPOINT, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            imageBase64: base64,
-            // optionally pass current lat/lng if you want:
-            latitude: form.latitude,
-            longitude: form.longitude,
-          }),
-        })
-
-        if (!res.ok) {
-          console.error('Card OCR error:', res.status, await res.text())
-          setLocStatus('Card scan failed. Please try again.')
-          return
-        }
-
-        const data = await res.json()
-
-        // Expecting something like:
-        // { company, contact, email, phone, imageUrl }
-        setForm(prev => ({
-          ...prev,
-          company: data.company || prev.company,
-          contact_name: data.contact || prev.contact_name,
-          email: data.email || prev.email,
-          phone: data.phone || prev.phone,
-          // later we can also store data.imageUrl in DB when we add that column
-        }))
-
-        setLocStatus('Card scanned. Fields updated from the card ✅')
-      } catch (err) {
-        console.error(err)
-        setLocStatus('Card scan failed. Please try again.')
-      }
-    }
-
-    input.click()
-  } catch (e) {
-    console.error(e)
-  }
-}
+  // OCR endpoint
+  const CARD_OCR_ENDPOINT = '/api/ocr'
 
   // Dropdown options
   const [statusOptions, setStatusOptions] = useState([])
@@ -114,9 +53,72 @@ async function handleScanCard() {
   const [loadingLeads, setLoadingLeads] = useState(true)
   const [locStatus, setLocStatus] = useState(null)
 
+  // Nearby business lookup
+  const [businesses, setBusinesses] = useState([])
+  const [loadingBusinesses, setLoadingBusinesses] = useState(false)
+  const [businessError, setBusinessError] = useState(null)
+  const [showBusinessPicker, setShowBusinessPicker] = useState(false)
+
   function handleChange(e) {
     const { name, value } = e.target
     setForm(prev => ({ ...prev, [name]: value }))
+  }
+
+  async function handleScanCard() {
+    try {
+      const input = document.createElement('input')
+      input.type = 'file'
+      input.accept = 'image/*'
+      input.capture = 'environment' // prefer rear camera on mobile
+
+      input.onchange = async () => {
+        const file = input.files?.[0]
+        if (!file) return
+
+        setStatusMsg(null)
+        setLocStatus('Processing card photo…')
+
+        try {
+          const base64 = await fileToBase64(file)
+
+          const res = await fetch(CARD_OCR_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              imageBase64: base64,
+              latitude: form.latitude,
+              longitude: form.longitude,
+            }),
+          })
+
+          if (!res.ok) {
+            console.error('Card OCR error:', res.status, await res.text())
+            setLocStatus('Card scan failed. Please try again.')
+            return
+          }
+
+          const data = await res.json()
+
+          // { company, contact, email, phone, imageUrl }
+          setForm(prev => ({
+            ...prev,
+            company: data.company || prev.company,
+            contact_name: data.contact || prev.contact_name,
+            email: data.email || prev.email,
+            phone: data.phone || prev.phone,
+          }))
+
+          setLocStatus('Card scanned. Fields updated from the card ✅')
+        } catch (err) {
+          console.error(err)
+          setLocStatus('Card scan failed. Please try again.')
+        }
+      }
+
+      input.click()
+    } catch (e) {
+      console.error(e)
+    }
   }
 
   // Load dropdown options from Supabase
@@ -146,7 +148,8 @@ async function handleScanCard() {
 
     if (statusRes.error) console.error('Status options error:', statusRes.error)
     if (ratingRes.error) console.error('Rating options error:', ratingRes.error)
-    if (industryRes.error) console.error('Industry options error:', industryRes.error)
+    if (industryRes.error)
+      console.error('Industry options error:', industryRes.error)
 
     if (!statusRes.error && statusRes.data) setStatusOptions(statusRes.data)
     if (!ratingRes.error && ratingRes.data) setRatingOptions(ratingRes.data)
@@ -173,10 +176,10 @@ async function handleScanCard() {
   }
 
   useEffect(() => {
-  loadLeads()
-  loadOptionLists()
-  autoGetLocation()
-}, [])
+    loadLeads()
+    loadOptionLists()
+    autoGetLocation()
+  }, [])
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -235,37 +238,125 @@ async function handleScanCard() {
     setLoading(false)
   }
 
-function autoGetLocation() {
-  if (!navigator.geolocation) {
-    setLocStatus('Geolocation not supported on this device.')
-    return
+  function autoGetLocation() {
+    if (!navigator.geolocation) {
+      setLocStatus('Geolocation not supported on this device.')
+      return
+    }
+
+    setLocStatus('Getting your location…')
+
+    navigator.geolocation.getCurrentPosition(
+      position => {
+        const { latitude, longitude } = position.coords
+        setForm(prev => ({
+          ...prev,
+          latitude: latitude.toString(),
+          longitude: longitude.toString(),
+        }))
+        setLocStatus(
+          `Location detected: ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`
+        )
+      },
+      error => {
+        console.error(error)
+        setLocStatus('Unable to get location.')
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+      }
+    )
   }
 
-  setLocStatus('Getting your location…')
+  async function handleFindNearbyBusinesses() {
+    setBusinessError(null)
 
-  navigator.geolocation.getCurrentPosition(
-    position => {
-      const { latitude, longitude } = position.coords
-      setForm(prev => ({
-        ...prev,
-        latitude: latitude.toString(),
-        longitude: longitude.toString(),
-      }))
-      setLocStatus(
-        `Location detected: ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`
-      )
-    },
-    error => {
-      console.error(error)
-      setLocStatus('Unable to get location.')
-    },
-    {
-      enableHighAccuracy: true,
-      timeout: 10000,
+    let lat = form.latitude
+    let lng = form.longitude
+
+    // If we don't have coords yet, try to get them
+    if (!lat || !lng) {
+      if (!navigator.geolocation) {
+        setBusinessError('Geolocation not supported on this device.')
+        return
+      }
+
+      setLocStatus('Getting your location before searching nearby…')
+
+      try {
+        const coords = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(
+            position => resolve(position.coords),
+            err => reject(err),
+            { enableHighAccuracy: true, timeout: 10000 }
+          )
+        })
+        lat = coords.latitude.toString()
+        lng = coords.longitude.toString()
+        setForm(prev => ({
+          ...prev,
+          latitude: lat,
+          longitude: lng,
+        }))
+        setLocStatus(
+          `Location detected: ${coords.latitude.toFixed(
+            5
+          )}, ${coords.longitude.toFixed(5)}`
+        )
+      } catch (err) {
+        console.error(err)
+        setLocStatus('Unable to get location for nearby search.')
+        setBusinessError('Unable to get location.')
+        return
+      }
     }
-  )
-}
 
+    setLoadingBusinesses(true)
+    setShowBusinessPicker(true)
+
+    try {
+      const params = new URLSearchParams({
+        lat: lat.toString(),
+        lng: lng.toString(),
+      })
+      const res = await fetch(`/api/places?${params.toString()}`)
+      if (!res.ok) {
+        const txt = await res.text()
+        console.error('Places error', res.status, txt)
+        setBusinessError('Nearby business lookup failed.')
+        setBusinesses([])
+      } else {
+        const json = await res.json()
+        setBusinesses(json.businesses || [])
+        if (!json.businesses || json.businesses.length === 0) {
+          setBusinessError('No nearby businesses found.')
+        }
+      }
+    } catch (err) {
+      console.error(err)
+      setBusinessError('Nearby business lookup failed.')
+      setBusinesses([])
+    }
+
+    setLoadingBusinesses(false)
+  }
+
+  function handleSelectBusiness(biz) {
+    // Prefill form from selected business
+    setForm(prev => ({
+      ...prev,
+      company: biz.name || prev.company,
+      note:
+        prev.note ||
+        (biz.address
+          ? `${biz.address}${
+              biz.phone ? ` • ${biz.phone}` : ''
+            }${biz.website ? ` • ${biz.website}` : ''}`
+          : prev.note),
+    }))
+    setShowBusinessPicker(false)
+  }
 
   return (
     <>
@@ -291,7 +382,7 @@ function autoGetLocation() {
               Entry
             </button>
             <button
-              type="button"
+              type="button'
               onClick={() => setView('admin')}
               style={{
                 background: view === 'admin' ? '#ffffff22' : 'transparent',
@@ -315,24 +406,24 @@ function autoGetLocation() {
               <h1>Sales Activity Entry</h1>
 
               {/* Scan card button (optional) */}
-<button
-  type="button"
-  onClick={handleScanCard}
-  style={{
-    width: '100%',
-    marginBottom: 16,
-    padding: '14px 16px',
-    fontWeight: 600,
-    borderRadius: 12,
-    border: 'none',
-    background: 'var(--navy)',
-    color: 'white',
-    fontSize: '1rem',
-    boxShadow: 'var(--shadow)',
-  }}
->
-  📷 Scan Business Card (Optional)
-</button>
+              <button
+                type="button"
+                onClick={handleScanCard}
+                style={{
+                  width: '100%',
+                  marginBottom: 16,
+                  padding: '14px 16px',
+                  fontWeight: 600,
+                  borderRadius: 12,
+                  border: 'none',
+                  background: 'var(--navy)',
+                  color: 'white',
+                  fontSize: '1rem',
+                  boxShadow: 'var(--shadow)',
+                }}
+              >
+                📷 Scan Business Card (Optional)
+              </button>
 
               {/* LEAD FORM */}
               <form onSubmit={handleSubmit}>
@@ -459,28 +550,60 @@ function autoGetLocation() {
                 </label>
 
                 <div className="section-title">Location</div>
-<div className="section-divider" />
+                <div className="section-divider" />
 
-{/* Hidden lat/long fields still stored in state & sent to Supabase */}
-<div style={{ display: 'none' }}>
-  <input
-    name="latitude"
-    value={form.latitude}
-    onChange={handleChange}
-  />
-  <input
-    name="longitude"
-    value={form.longitude}
-    onChange={handleChange}
-  />
-</div>
+                {/* Hidden lat/long fields still stored in state & sent to Supabase */}
+                <div style={{ display: 'none' }}>
+                  <input
+                    name="latitude"
+                    value={form.latitude}
+                    onChange={handleChange}
+                  />
+                  <input
+                    name="longitude"
+                    value={form.longitude}
+                    onChange={handleChange}
+                  />
+                </div>
 
-{locStatus && (
-  <div className="helper" style={{ marginTop: 8, marginBottom: 16 }}>
-    {locStatus}
-  </div>
-)}
+                {locStatus && (
+                  <div
+                    className="helper"
+                    style={{ marginTop: 8, marginBottom: 16 }}
+                  >
+                    {locStatus}
+                  </div>
+                )}
 
+                <button
+                  type="button"
+                  onClick={handleFindNearbyBusinesses}
+                  style={{
+                    width: '100%',
+                    marginTop: 8,
+                    marginBottom: 4,
+                    padding: '12px 16px',
+                    borderRadius: 12,
+                    border: 'none',
+                    fontWeight: 600,
+                    fontSize: '0.95rem',
+                    background: 'var(--navy-2)',
+                    color: 'white',
+                    boxShadow: 'var(--shadow)',
+                  }}
+                  disabled={loadingBusinesses}
+                >
+                  {loadingBusinesses ? 'Searching nearby…' : 'Find Nearby Businesses'}
+                </button>
+
+                {businessError && (
+                  <div
+                    className="helper"
+                    style={{ marginTop: 4, marginBottom: 8, color: '#b91c1c' }}
+                  >
+                    {businessError}
+                  </div>
+                )}
 
                 <button
                   type="submit"
@@ -546,9 +669,7 @@ function autoGetLocation() {
                           {lead.phone && <span>{lead.phone}</span>}
                         </div>
                       )}
-                      {(lead.status ||
-                        lead.rating ||
-                        lead.industry) && (
+                      {(lead.status || lead.rating || lead.industry) && (
                         <div style={{ marginTop: 4, opacity: 0.9 }}>
                           {lead.status && (
                             <span>Status: {lead.status}</span>
@@ -576,6 +697,137 @@ function autoGetLocation() {
                   ))}
                 </div>
               </div>
+
+              {/* BUSINESS PICKER SHEET */}
+              {showBusinessPicker && (
+                <div
+                  style={{
+                    position: 'fixed',
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    top: '30%',
+                    background: 'rgba(15, 23, 42, 0.35)',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'flex-end',
+                    zIndex: 60,
+                  }}
+                  onClick={() => setShowBusinessPicker(false)}
+                >
+                  <div
+                    style={{
+                      width: '100%',
+                      maxWidth: 820,
+                      margin: '0 auto',
+                      background: '#fff',
+                      borderTopLeftRadius: 24,
+                      borderTopRightRadius: 24,
+                      boxShadow: '0 -10px 24px rgba(15,23,42,0.25)',
+                      padding: 16,
+                      maxHeight: '70%',
+                      overflowY: 'auto',
+                    }}
+                    onClick={e => e.stopPropagation()}
+                  >
+                    <div
+                      style={{
+                        width: 40,
+                        height: 4,
+                        borderRadius: 999,
+                        background: '#e5e7eb',
+                        margin: '0 auto 8px',
+                      }}
+                    />
+                    <h2
+                      style={{
+                        marginTop: 4,
+                        marginBottom: 8,
+                        fontSize: '1rem',
+                      }}
+                    >
+                      Nearby Businesses
+                    </h2>
+                    {loadingBusinesses && <p>Searching nearby…</p>}
+                    {!loadingBusinesses && businesses.length === 0 && (
+                      <p className="helper">
+                        {businessError || 'No nearby businesses found.'}
+                      </p>
+                    )}
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 8,
+                        marginTop: 4,
+                      }}
+                    >
+                      {businesses.map(biz => (
+                        <button
+                          key={biz.place_id}
+                          type="button"
+                          onClick={() => handleSelectBusiness(biz)}
+                          style={{
+                            textAlign: 'left',
+                            padding: 10,
+                            borderRadius: 12,
+                            border: '1px solid var(--border)',
+                            background: '#f9fafb',
+                            boxShadow: 'none',
+                            minHeight: 0,
+                            fontSize: '0.9rem',
+                          }}
+                        >
+                          <div style={{ fontWeight: 700 }}>{biz.name}</div>
+                          {biz.address && (
+                            <div
+                              style={{
+                                fontSize: '0.8rem',
+                                color: '#4b5563',
+                                marginTop: 2,
+                              }}
+                            >
+                              {biz.address}
+                            </div>
+                          )}
+                          {(biz.phone || biz.website) && (
+                            <div
+                              style={{
+                                fontSize: '0.8rem',
+                                color: '#4b5563',
+                                marginTop: 2,
+                              }}
+                            >
+                              {biz.phone && <span>{biz.phone}</span>}
+                              {biz.phone && biz.website && (
+                                <span>{' • '}</span>
+                              )}
+                              {biz.website && (
+                                <span>
+                                  {biz.website.replace(/^https?:\/\//, '')}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowBusinessPicker(false)}
+                      style={{
+                        width: '100%',
+                        marginTop: 12,
+                        minHeight: 40,
+                        fontSize: '0.9rem',
+                      }}
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              )}
             </>
           ) : (
             <AdminOptions
