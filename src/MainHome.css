@@ -9,11 +9,54 @@
   --gold2: #704f00;
 }
 
-/* Layout */
+/* Top-level CRM layout */
 #homeRoot.home-grid {
+  min-height: calc(100vh - 70px); /* header is above from App.jsx */
+  padding: 16px 20px 24px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Tabs row at top (Home / Sales / Recruiting / Tasks / Reports) */
+.crm-top-tabs {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: #0b1729;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.45);
+  align-self: center;
+  margin-bottom: 14px;
+}
+
+.top-tab {
+  border: none;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  cursor: pointer;
+  background: transparent;
+  color: #cbd5f5;
+}
+
+.top-tab.active {
+  background: #ffffff;
+  color: #0f172a;
+}
+
+/* Main content area */
+.home-content {
+  flex: 1;
+  max-width: 1280px;
+  width: 100%;
+  margin: 0 auto;
   display: grid;
-  gap: 12px;
+  grid-auto-rows: min-content;
   grid-template-columns: 1fr;
+  gap: 12px;
 }
 
 /* Generic card */
@@ -32,6 +75,11 @@
   color: #0f172a;
 }
 
+/* Big single-panel card (Sales / Recruiting / Tasks / Reports) */
+.big-card {
+  min-height: 380px;
+}
+
 /* Flex helpers */
 .row {
   display: flex;
@@ -43,6 +91,7 @@
   justify-content: space-between;
 }
 
+/* Meta / helper text */
 .meta {
   font-size: 12px;
   color: #64748b;
@@ -93,22 +142,22 @@
   color: #6b7280;
 }
 
-/* Link-style small button (Open Calendar) */
+/* Tiny pill link (Open Calendar) */
 .link-btn {
-  font-size: 12px;
+  font-size: 11px;
   text-decoration: none;
-  padding: 6px 8px;
-  border-radius: 8px;
+  padding: 5px 9px;
+  border-radius: 999px;
   border: 1px solid #e5e7eb;
   color: #0f172a;
   background: #f9fafb;
 }
 
-/* Toolbar row */
+/* Toolbar row (inside Home) */
 .btn-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
 }
 
@@ -116,14 +165,16 @@
   flex: 1;
 }
 
+/* Tighter buttons */
 .btn {
   border: none;
-  border-radius: 12px;
-  padding: 9px 14px;
-  font-size: 12px;
+  border-radius: 999px;
+  padding: 7px 12px; /* tighter */
+  font-size: 11px;   /* tighter */
   font-weight: 600;
   cursor: pointer;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
   white-space: nowrap;
   display: inline-flex;
   align-items: center;
@@ -158,6 +209,10 @@
   grid-column: 1 / -1;
 }
 
+.embed-header {
+  margin-bottom: 4px;
+}
+
 .embed-wrap {
   padding: 6px 0 16px;
 }
@@ -173,32 +228,21 @@
   margin-top: 4px;
 }
 
-/* Simple tooltip using data-tip */
-.btn[data-tip] {
-  position: relative;
+/* Bullet lists for placeholder sections */
+.bullet-list {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  font-size: 13px;
+  color: #111827;
 }
 
-.btn[data-tip]::after {
-  content: attr(data-tip);
-  position: absolute;
-  bottom: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
-  background: #111827;
-  color: #ffffff;
-  padding: 6px 8px;
-  border-radius: 10px;
-  font-size: 11px;
-  max-width: 260px;
-  white-space: normal;
-  overflow-wrap: anywhere;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.24);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.12s ease-in-out;
-  z-index: 99;
+.bullet-list li + li {
+  margin-top: 3px;
 }
 
-.btn[data-tip]:hover::after {
-  opacity: 1;
+/* Responsive tweaks */
+@media (min-width: 900px) {
+  .home-content {
+    grid-template-columns: minmax(0, 1.3fr);
+  }
 }
