@@ -274,7 +274,7 @@ function autoGetLocation() {
         <div className="header-inner">
           <div className="brand">
             <div className="brand-logo" />
-            <span>LaborMAX Sales</span>
+            <span>CRM Staffing Sales</span>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <button
