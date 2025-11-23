@@ -4,21 +4,20 @@ export async function onRequestPost({ request, env }) {
     const { imageBase64 } = await request.json()
 
     if (!imageBase64) {
-      return new Response(
-        JSON.stringify({ error: 'Missing imageBase64 in request body' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      return jsonResponse(
+        { error: 'Missing imageBase64 in request body' },
+        400
       )
     }
 
     const apiKey = env.GOOGLE_VISION_API_KEY
     if (!apiKey) {
-      return new Response(
-        JSON.stringify({ error: 'Vision API key not configured' }),
-        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      return jsonResponse(
+        { error: 'Vision API key not configured on server' },
+        500
       )
     }
 
-    // Call Google Vision API
     const visionUrl =
       'https://vision.googleapis.com/v1/images:annotate?key=' + apiKey
 
@@ -37,44 +36,64 @@ export async function onRequestPost({ request, env }) {
       body: JSON.stringify(visionBody),
     })
 
+    const visionText = await visionRes.text()
+
     if (!visionRes.ok) {
-      const txt = await visionRes.text()
-      console.error('Vision error:', visionRes.status, txt)
-      return new Response(
-        JSON.stringify({ error: 'Vision API call failed' }),
-        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      // Log full response to Cloudflare logs
+      console.error('Vision error:', visionRes.status, visionText)
+
+      // Return a safe, truncated error to the client
+      return jsonResponse(
+        {
+          error: 'Vision API call failed',
+          status: visionRes.status,
+          details: visionText.slice(0, 400), // just first 400 chars
+        },
+        500
       )
     }
 
-    const visionJson = await visionRes.json()
+    const visionJson = JSON.parse(visionText)
+
     const text =
       visionJson?.responses?.[0]?.fullTextAnnotation?.text ||
       visionJson?.responses?.[0]?.textAnnotations?.[0]?.description ||
       ''
 
     if (!text) {
-      return new Response(
-        JSON.stringify({ error: 'No text detected on card' }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      return jsonResponse(
+        { error: 'No text detected on card', text: '' },
+        200
       )
     }
 
     const parsed = parseCardText(text)
 
-    return new Response(JSON.stringify(parsed), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    })
+    return jsonResponse(
+      {
+        ...parsed,
+        // optional: include raw text for debugging
+        raw_text: text,
+      },
+      200
+    )
   } catch (err) {
     console.error('OCR handler error:', err)
-    return new Response(
-      JSON.stringify({ error: 'Unexpected error in OCR endpoint' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    return jsonResponse(
+      { error: 'Unexpected error in OCR endpoint', details: String(err) },
+      500
     )
   }
 }
 
-// Very simple parser – we can refine this as we test real cards
+function jsonResponse(body, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  })
+}
+
+// Simple parser; we can refine based on real cards later
 function parseCardText(rawText) {
   const lines = rawText
     .split(/\r?\n/)
@@ -82,8 +101,7 @@ function parseCardText(rawText) {
     .filter(Boolean)
 
   const emailRegex = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i
-  const phoneRegex =
-    /(\+?\d[\d\s().-]{7,}\d)/ // loose match for typical phone patterns
+  const phoneRegex = /(\+?\d[\d\s().-]{7,}\d)/
 
   let email = ''
   let phone = ''
@@ -101,19 +119,8 @@ function parseCardText(rawText) {
     }
   }
 
-  // crude guess: first line is often person or company; second line the other
-  if (lines.length > 0) {
-    company = lines[0]
-  }
-  if (lines.length > 1) {
-    contact = lines[1]
-  }
+  if (lines.length > 0) company = lines[0]
+  if (lines.length > 1) contact = lines[1]
 
-  return {
-    company,
-    contact,
-    email,
-    phone,
-    raw_text: rawText,
-  }
+  return { company, contact, email, phone }
 }
