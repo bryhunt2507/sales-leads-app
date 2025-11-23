@@ -21,12 +21,12 @@ export async function onRequest(context) {
   }
 
   try {
-    // Places API (New) endpoint
     const placesUrl = 'https://places.googleapis.com/v1/places:searchNearby'
 
-    // Request body for Places API (New)
+    // ✅ Places API (New) request body
+    // Use a valid type: "point_of_interest" instead of old "establishment"
     const body = {
-      includedTypes: ['establishment'],
+      includedTypes: ['point_of_interest'],
       maxResultCount: 15,
       locationRestriction: {
         circle: {
@@ -44,7 +44,6 @@ export async function onRequest(context) {
       headers: {
         'Content-Type': 'application/json',
         'X-Goog-Api-Key': apiKey,
-        // Only request fields we actually need
         'X-Goog-FieldMask':
           'places.id,places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri',
       },
