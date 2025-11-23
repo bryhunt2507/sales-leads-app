@@ -9,14 +9,14 @@
   --gold2: #704f00;
 }
 
-/* Grid container for the CRM home */
+/* Layout */
 #homeRoot.home-grid {
   display: grid;
   gap: 12px;
   grid-template-columns: 1fr;
 }
 
-/* Reuse card style similar to phone app */
+/* Generic card */
 .card {
   background: #ffffff;
   border: 1px solid #e5e7eb;
@@ -25,7 +25,14 @@
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
 }
 
-/* Common flex rows */
+.card-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+/* Flex helpers */
 .row {
   display: flex;
   align-items: center;
@@ -36,25 +43,21 @@
   justify-content: space-between;
 }
 
-/* Metadata text */
 .meta {
   font-size: 12px;
-  color: #475569;
-}
-
-.empty {
   color: #64748b;
 }
 
-/* Calendar styles */
-.cal-card .row {
-  justify-content: space-between;
+.empty {
+  font-size: 13px;
+  color: #94a3b8;
 }
 
+/* Calendar styles */
 .cal-list {
-  margin: 10px 0 0;
-  padding: 0;
   list-style: none;
+  padding: 0;
+  margin: 10px 0 0;
 }
 
 .cal-item {
@@ -68,7 +71,7 @@
   margin-bottom: 6px;
 }
 
-.cal-time {
+.cal-when {
   font-size: 12px;
   font-weight: 600;
   color: #0f172a;
@@ -82,15 +85,26 @@
 .cal-title {
   font-size: 14px;
   font-weight: 600;
-  color: #0f172a;
+  color: #111827;
 }
 
 .cal-meta {
   font-size: 12px;
-  color: #64748b;
+  color: #6b7280;
 }
 
-/* Toolbar */
+/* Link-style small button (Open Calendar) */
+.link-btn {
+  font-size: 12px;
+  text-decoration: none;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  color: #0f172a;
+  background: #f9fafb;
+}
+
+/* Toolbar row */
 .btn-row {
   display: flex;
   flex-wrap: wrap;
@@ -98,41 +112,45 @@
   align-items: center;
 }
 
+.btn-spacer {
+  flex: 1;
+}
+
 .btn {
-  border-radius: 999px;
   border: none;
-  padding: 8px 14px;
+  border-radius: 12px;
+  padding: 9px 14px;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  text-decoration: none;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  white-space: nowrap;
+  text-decoration: none;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.16);
+  color: #ffffff;
 }
 
 .btn.blue {
-  background: var(--primary);
-  color: #ffffff;
+  background: linear-gradient(180deg, var(--primary), var(--accent));
 }
 
 .btn.blue.active {
-  background: #172f56;
+  outline: 2px solid #1f7ae0;
 }
 
 .btn.green {
-  background: var(--green);
-  color: #ffffff;
+  background: linear-gradient(180deg, var(--green), var(--green2));
 }
 
 .btn.gold {
-  background: var(--gold);
-  color: #ffffff;
+  background: linear-gradient(180deg, var(--gold), var(--gold2));
 }
 
 .btn:hover {
-  filter: brightness(0.95);
+  filter: brightness(0.96);
 }
 
 /* Embed area */
@@ -140,9 +158,47 @@
   grid-column: 1 / -1;
 }
 
+.embed-wrap {
+  padding: 6px 0 16px;
+}
+
 .embed-placeholder {
-  border-radius: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
   background: #f9fafb;
   border: 1px dashed #cbd5f5;
-  padding: 14px;
+}
+
+.embed-status {
+  margin-top: 4px;
+}
+
+/* Simple tooltip using data-tip */
+.btn[data-tip] {
+  position: relative;
+}
+
+.btn[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #111827;
+  color: #ffffff;
+  padding: 6px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  max-width: 260px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.24);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease-in-out;
+  z-index: 99;
+}
+
+.btn[data-tip]:hover::after {
+  opacity: 1;
 }
