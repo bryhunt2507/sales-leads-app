@@ -382,7 +382,7 @@ function App() {
               Entry
             </button>
             <button
-              type="button'
+              type="button"
               onClick={() => setView('admin')}
               style={{
                 background: view === 'admin' ? '#ffffff22' : 'transparent',
@@ -671,14 +671,10 @@ function App() {
                       )}
                       {(lead.status || lead.rating || lead.industry) && (
                         <div style={{ marginTop: 4, opacity: 0.9 }}>
-                          {lead.status && (
-                            <span>Status: {lead.status}</span>
-                          )}
+                          {lead.status && <span>Status: {lead.status}</span>}
                           {lead.status &&
                             (lead.rating || lead.industry) && <span> · </span>}
-                          {lead.rating && (
-                            <span>Rating: {lead.rating}</span>
-                          )}
+                          {lead.rating && <span>Rating: {lead.rating}</span>}
                           {lead.rating && lead.industry && <span> · </span>}
                           {lead.industry && (
                             <span>Industry: {lead.industry}</span>
@@ -845,3 +841,4 @@ function App() {
 }
 
 export default App
+ 
