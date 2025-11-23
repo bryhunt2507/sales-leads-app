@@ -18,25 +18,20 @@ async function fileToBase64(file) {
   })
 }
 
-// Default organization for legacy use (LaborMax main branch)
+// Default org for now (your existing org)
 const DEFAULT_ORGANIZATION_ID = 'a0a50cfb-f1e9-4515-8176-61e2625350d9'
 
-
 function App() {
-
-    // Auth / profile / organization
+  // Auth / profile / organization
+  const [authUser, setAuthUser] = useState(null)
   const [profile, setProfile] = useState(null)
   const [organizationId, setOrganizationId] = useState(DEFAULT_ORGANIZATION_ID)
- 
-
+  const [authLoading, setAuthLoading] = useState(true)
 
   // 'home' | 'entry' | 'admin'
   const [view, setView] = useState('home')
   const [selectedBusiness, setSelectedBusiness] = useState(null)
 
-  // Auth state (for Google sign-in)
-  const [authUser, setAuthUser] = useState(null)
-  const [authLoading, setAuthLoading] = useState(true)
 
   // OCR endpoint
   const CARD_OCR_ENDPOINT = '/api/ocr'
@@ -299,7 +294,9 @@ useEffect(() => {
 }, [])
 
   // Load dropdown options from Supabase
+    // Load dropdown options for the current organization
   async function loadOptionLists() {
+    if (!organizationId) return
     setLoadingOptions(true)
 
     const [statusRes, ratingRes, industryRes] = await Promise.all([
@@ -337,13 +334,25 @@ useEffect(() => {
 
   // Load leads
   async function loadLeads() {
+    if (!organizationId) return
     setLoadingLeads(true)
 
-    let query = supabase
+    const { data, error } = await supabase
       .from('leads')
       .select('*')
+      .eq('organization_id', organizationId)
       .order('created_at', { ascending: false })
       .limit(20)
+
+    if (error) {
+      console.error('Error loading leads:', error)
+    } else {
+      setLeads(data || [])
+    }
+
+    setLoadingLeads(false)
+  }
+
 
     if (organizationId) {
       query = query.eq('organization_id', organizationId)
@@ -364,12 +373,89 @@ useEffect(() => {
     autoGetLocation()
   }, [])
 
+    // Load current auth user + profile + organization
+  useEffect(() => {
+    let isMounted = true
+
+    async function initAuth() {
+      try {
+        // 1) Get current auth user (Google account)
+        const {
+          data: { user },
+        } = await supabase.auth.getUser()
+
+        if (!isMounted) return
+
+        setAuthUser(user || null)
+
+        if (user?.email) {
+          // 2) Look up profile by email
+          const { data: profileRow, error: profileError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('email', user.email)
+            .maybeSingle()
+
+          if (profileError) {
+            console.error('Error loading profile', profileError)
+          }
+
+          if (profileRow) {
+            setProfile(profileRow)
+
+            // 3) Drive organization from profile
+            if (profileRow.organization_id) {
+              setOrganizationId(profileRow.organization_id)
+            }
+          } else {
+            // Optional: create a default profile if one does not exist yet
+            const { data: newProfile, error: insertError } = await supabase
+              .from('profiles')
+              .insert({
+                email: user.email,
+                role: 'user',
+                organization_id: DEFAULT_ORGANIZATION_ID,
+              })
+              .select()
+              .maybeSingle()
+
+            if (!insertError && newProfile && isMounted) {
+              setProfile(newProfile)
+              setOrganizationId(
+                newProfile.organization_id || DEFAULT_ORGANIZATION_ID
+              )
+            } else if (insertError) {
+              console.error('Error creating default profile', insertError)
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error initializing auth/profile', err)
+      } finally {
+        if (isMounted) setAuthLoading(false)
+      }
+    }
+
+    initAuth()
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
   // Load org-scoped data once we know the org
+    // Get device location once on mount
+  useEffect(() => {
+    autoGetLocation()
+  }, [])
+
+  // Whenever organizationId changes, load org-specific data
   useEffect(() => {
     if (!organizationId) return
     loadLeads()
     loadOptionLists()
   }, [organizationId])
+
 
 
   async function handleSubmit(e) {
@@ -385,9 +471,9 @@ useEffect(() => {
 
     const { data, error } = await supabase
       .from('leads')
-      .insert([
+            .insert([
         {
-          organization_id: organizationId,
+          organization_id: organizationId || DEFAULT_ORGANIZATION_ID,
           company: form.company,
           contact_name: form.contact_name,
           email: form.email,
@@ -1280,7 +1366,7 @@ useEffect(() => {
               </>
             ) : isAdmin ? (
               <AdminOptions
-                organizationId={organizationId}
+                organizationId={organizationId || DEFAULT_ORGANIZATION_ID}
                 statusOptions={statusOptions}
                 ratingOptions={ratingOptions}
                 industryOptions={industryOptions}
