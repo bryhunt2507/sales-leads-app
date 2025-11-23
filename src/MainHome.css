@@ -1,0 +1,148 @@
+/* src/MainHome.css */
+
+:root {
+  --primary: #0f2c4d;
+  --accent: #41566e;
+  --green: #0e6a40;
+  --green2: #0a4e2f;
+  --gold: #8c6b00;
+  --gold2: #704f00;
+}
+
+/* Grid container for the CRM home */
+#homeRoot.home-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1fr;
+}
+
+/* Reuse card style similar to phone app */
+.card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 14px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+}
+
+/* Common flex rows */
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.row.between {
+  justify-content: space-between;
+}
+
+/* Metadata text */
+.meta {
+  font-size: 12px;
+  color: #475569;
+}
+
+.empty {
+  color: #64748b;
+}
+
+/* Calendar styles */
+.cal-card .row {
+  justify-content: space-between;
+}
+
+.cal-list {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cal-item {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  margin-bottom: 6px;
+}
+
+.cal-time {
+  font-size: 12px;
+  font-weight: 600;
+  color: #0f172a;
+  min-width: 70px;
+}
+
+.cal-main {
+  flex: 1;
+}
+
+.cal-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.cal-meta {
+  font-size: 12px;
+  color: #64748b;
+}
+
+/* Toolbar */
+.btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.btn {
+  border-radius: 999px;
+  border: none;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+.btn.blue {
+  background: var(--primary);
+  color: #ffffff;
+}
+
+.btn.blue.active {
+  background: #172f56;
+}
+
+.btn.green {
+  background: var(--green);
+  color: #ffffff;
+}
+
+.btn.gold {
+  background: var(--gold);
+  color: #ffffff;
+}
+
+.btn:hover {
+  filter: brightness(0.95);
+}
+
+/* Embed area */
+.embed-card {
+  grid-column: 1 / -1;
+}
+
+.embed-placeholder {
+  border-radius: 10px;
+  background: #f9fafb;
+  border: 1px dashed #cbd5f5;
+  padding: 14px;
+}
