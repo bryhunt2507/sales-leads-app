@@ -78,6 +78,24 @@ function App() {
         : selectedBusiness.category.text || ''
       : ''
 
+async function handleSendMagicLink(email) {
+  try {
+    const { error } = await supabase.auth.signInWithOtp({
+      email: email,
+    })
+
+    if (error) {
+      alert("Error sending sign-in link: " + error.message)
+    } else {
+      alert("Sign-in link sent to " + email)
+    }
+  } catch (err) {
+    console.error(err)
+    alert("Something went wrong.")
+  }
+}
+
+
         // Load current auth user & profile (company/org/role)
   useEffect(() => {
     async function loadProfile() {
@@ -177,6 +195,34 @@ function App() {
       console.error(e)
     }
   }
+
+  // Listen for login/logout events
+useEffect(() => {
+  const { data: listener } = supabase.auth.onAuthStateChange(
+    async (event, session) => {
+      if (session?.user?.email) {
+        // Re-load profile after login
+        const { data: prof } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('email', session.user.email)
+          .single()
+
+        setProfile(prof || null)
+        if (prof?.organization_id) {
+          setOrganizationId(prof.organization_id)
+        }
+      } else {
+        setProfile(null)
+        setOrganizationId(DEFAULT_ORGANIZATION_ID)
+      }
+    }
+  )
+
+  return () => {
+    listener.subscription.unsubscribe()
+  }
+}, [])
 
   // Load dropdown options from Supabase
   async function loadOptionLists() {
@@ -510,9 +556,28 @@ function App() {
                 Admin
               </button>
             )}
-            <div className="user-badge">
-              {profile?.email || 'Not signed in'}
-            </div>
+           <div className="user-badge">
+  {profile?.email ? (
+    profile.email
+  ) : (
+    <button
+      type="button"
+      onClick={() => {
+        const email = prompt("Enter your work email address:")
+        if (email) handleSendMagicLink(email)
+      }}
+      style={{
+        background: 'transparent',
+        border: 'none',
+        color: 'white',
+        cursor: 'pointer',
+        fontSize: '0.9rem',
+      }}
+    >
+      Not signed in
+    </button>
+  )}
+</div>
           </div>
         </div>
       </header>
