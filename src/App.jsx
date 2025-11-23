@@ -27,11 +27,16 @@ function App() {
     // Auth / profile / organization
   const [profile, setProfile] = useState(null)
   const [organizationId, setOrganizationId] = useState(DEFAULT_ORGANIZATION_ID)
-  const [authLoading, setAuthLoading] = useState(true)
+ 
+
 
   // 'home' | 'entry' | 'admin'
   const [view, setView] = useState('home')
   const [selectedBusiness, setSelectedBusiness] = useState(null)
+
+  // Auth state (for Google sign-in)
+  const [authUser, setAuthUser] = useState(null)
+  const [authLoading, setAuthLoading] = useState(true)
 
   // OCR endpoint
   const CARD_OCR_ENDPOINT = '/api/ocr'
@@ -77,6 +82,7 @@ function App() {
         ? selectedBusiness.category
         : selectedBusiness.category.text || ''
       : ''
+
 
 async function handleSendMagicLink(email) {
   try {
@@ -132,6 +138,71 @@ async function handleSendMagicLink(email) {
 
     loadProfile()
   }, [])
+
+    // Load current auth user and listen for changes (Google login)
+  useEffect(() => {
+    async function loadUser() {
+      try {
+        setAuthLoading(true)
+        const { data, error } = await supabase.auth.getUser()
+        if (error) {
+          console.error('Error loading auth user:', error)
+          setAuthUser(null)
+        } else {
+          setAuthUser(data?.user ?? null)
+        }
+      } catch (err) {
+        console.error('Error loading auth user:', err)
+        setAuthUser(null)
+      } finally {
+        setAuthLoading(false)
+      }
+    }
+
+    loadUser()
+
+    const { data: subscription } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setAuthUser(session?.user ?? null)
+      }
+    )
+
+    return () => {
+      subscription?.subscription?.unsubscribe()
+    }
+  }, [])
+
+  // Start Google OAuth login
+  async function handleProviderLogin() {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin, // e.g. https://app.crmforstaffing.com
+        },
+      })
+
+      if (error) {
+        console.error('OAuth error', error)
+        alert('Error starting Google sign-in: ' + error.message)
+      }
+    } catch (err) {
+      console.error('OAuth error', err)
+      alert('Error starting Google sign-in.')
+    }
+  }
+
+  // Log out
+  async function handleLogout() {
+    try {
+      await supabase.auth.signOut()
+      setAuthUser(null)
+      window.location.reload()
+    } catch (err) {
+      console.error('Logout error', err)
+    }
+  }
+
 
   function handleChange(e) {
     const { name, value } = e.target
@@ -556,7 +627,50 @@ useEffect(() => {
                 Admin
               </button>
             )}
-           <div className="user-badge">
+                       <div
+              className="user-badge"
+              style={{ display: 'flex', gap: 8, alignItems: 'center' }}
+            >
+              {authLoading ? (
+                <span>Checking…</span>
+              ) : authUser?.email ? (
+                <>
+                  <span>{authUser.email}</span>
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    style={{
+                      background: '#ffffff22',
+                      borderRadius: 999,
+                      border: 'none',
+                      padding: '4px 8px',
+                      fontSize: '0.8rem',
+                      cursor: 'pointer',
+                      color: 'white',
+                    }}
+                  >
+                    Log out
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleProviderLogin}
+                  style={{
+                    background: '#ffffff22',
+                    borderRadius: 999,
+                    border: 'none',
+                    padding: '4px 8px',
+                    fontSize: '0.8rem',
+                    cursor: 'pointer',
+                    color: 'white',
+                  }}
+                >
+                  Sign in with Google
+                </button>
+              )}
+            </div>
+
   {profile?.email ? (
     profile.email
   ) : (
@@ -578,7 +692,7 @@ useEffect(() => {
     </button>
   )}
 </div>
-          </div>
+    
         </div>
       </header>
 
