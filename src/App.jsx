@@ -23,7 +23,6 @@ function App() {
   const [view, setView] = useState('entry')
   const [selectedBusiness, setSelectedBusiness] = useState(null)
 
-
   // OCR endpoint
   const CARD_OCR_ENDPOINT = '/api/ocr'
 
@@ -60,6 +59,14 @@ function App() {
   const [loadingBusinesses, setLoadingBusinesses] = useState(false)
   const [businessError, setBusinessError] = useState(null)
   const [showBusinessPicker, setShowBusinessPicker] = useState(false)
+
+  // 🔹 Safely turn category object/string into a plain label
+  const categoryLabel =
+    selectedBusiness && selectedBusiness.category
+      ? typeof selectedBusiness.category === 'string'
+        ? selectedBusiness.category
+        : selectedBusiness.category.text || ''
+      : ''
 
   function handleChange(e) {
     const { name, value } = e.target
@@ -330,15 +337,14 @@ function App() {
         setBusinesses([])
       } else {
         const json = await res.json()
-const bizList = json.businesses || []
+        const bizList = json.businesses || []
 
-setBusinesses(bizList)
-setSelectedBusiness(bizList.length > 0 ? bizList[0] : null)
+        setBusinesses(bizList)
+        setSelectedBusiness(bizList.length > 0 ? bizList[0] : null)
 
-if (bizList.length === 0) {
-  setBusinessError('No nearby businesses found.')
-}
-
+        if (bizList.length === 0) {
+          setBusinessError('No nearby businesses found.')
+        }
       }
     } catch (err) {
       console.error(err)
@@ -765,166 +771,181 @@ if (bizList.length === 0) {
                         marginTop: 4,
                       }}
                     >
-{businesses.map(biz => (
-  <button
-    key={biz.place_id}
-    type="button"
-    onClick={() => setSelectedBusiness(biz)}
-    style={{
-      textAlign: 'left',
-      padding: 10,
-      borderRadius: 12,
-      border: '1px solid var(--border)',
-      background:
-        selectedBusiness && selectedBusiness.place_id === biz.place_id
-          ? '#e5f0ff'
-          : '#f9fafb',
-      boxShadow: 'none',
-      minHeight: 0,
-      fontSize: '0.9rem',
-      color: 'var(--ink)',           // ✅ force dark text
-    }}
-  >
-    <div style={{ fontWeight: 700 }}>
-      {biz.name || biz.address}
-    </div>
-    {biz.address && (
-      <div
-        style={{
-          fontSize: '0.8rem',
-          color: '#4b5563',
-          marginTop: 2,
-        }}
-      >
-        {biz.address}
-      </div>
-    )}
-  </button>
-))}
+                      {businesses.map(biz => (
+                        <button
+                          key={biz.place_id}
+                          type="button"
+                          onClick={() => setSelectedBusiness(biz)}
+                          style={{
+                            textAlign: 'left',
+                            padding: 10,
+                            borderRadius: 12,
+                            border: '1px solid var(--border)',
+                            background:
+                              selectedBusiness &&
+                              selectedBusiness.place_id === biz.place_id
+                                ? '#e5f0ff'
+                                : '#f9fafb',
+                            boxShadow: 'none',
+                            minHeight: 0,
+                            fontSize: '0.9rem',
+                            color: 'var(--ink)', // force dark text
+                          }}
+                        >
+                          <div style={{ fontWeight: 700 }}>
+                            {biz.name || biz.address}
+                          </div>
+                          {biz.address && (
+                            <div
+                              style={{
+                                fontSize: '0.8rem',
+                                color: '#4b5563',
+                                marginTop: 2,
+                              }}
+                            >
+                              {biz.address}
+                            </div>
+                          )}
+                        </button>
+                      ))}
 
-{selectedBusiness && (
-  <div
-    style={{
-      marginTop: 12,
-      paddingTop: 8,
-      borderTop: '1px solid #e5e7eb',
-    }}
-  >
-    {/* Name + address */}
-    <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>
-      {selectedBusiness.name || selectedBusiness.address}
-    </div>
-    {selectedBusiness.address && (
-      <div
-        style={{
-          fontSize: '0.85rem',
-          color: '#4b5563',
-          marginTop: 2,
-        }}
-      >
-        {selectedBusiness.address}
-      </div>
-    )}
+                      {selectedBusiness && (
+                        <div
+                          style={{
+                            marginTop: 12,
+                            paddingTop: 8,
+                            borderTop: '1px solid #e5e7eb',
+                          }}
+                        >
+                          {/* Name + address */}
+                          <div
+                            style={{
+                              fontWeight: 800,
+                              fontSize: '0.95rem',
+                            }}
+                          >
+                            {selectedBusiness.name ||
+                              selectedBusiness.address}
+                          </div>
+                          {selectedBusiness.address && (
+                            <div
+                              style={{
+                                fontSize: '0.85rem',
+                                color: '#4b5563',
+                                marginTop: 2,
+                              }}
+                            >
+                              {selectedBusiness.address}
+                            </div>
+                          )}
 
-    {/* Rating / type / hours */}
-    {(selectedBusiness.rating ||
-      selectedBusiness.category ||
-      typeof selectedBusiness.openNow === 'boolean') && (
-      <div
-        style={{
-          fontSize: '0.8rem',
-          color: '#4b5563',
-          marginTop: 4,
-        }}
-      >
-        {selectedBusiness.rating && (
-          <span>
-            ⭐ {selectedBusiness.rating.toFixed(1)}
-            {selectedBusiness.ratingCount
-              ? ` (${selectedBusiness.ratingCount})`
-              : ''}
-          </span>
-        )}
-        {selectedBusiness.rating &&
-          (selectedBusiness.category ||
-            typeof selectedBusiness.openNow === 'boolean') && (
-            <span>{' • '}</span>
-          )}
-        {selectedBusiness.category && (
-          <span>{selectedBusiness.category}</span>
-        )}
-        {selectedBusiness.category &&
-          typeof selectedBusiness.openNow === 'boolean' && (
-            <span>{' • '}</span>
-          )}
-        {typeof selectedBusiness.openNow === 'boolean' && (
-          <span>
-            {selectedBusiness.openNow ? 'Open now' : 'Closed now'}
-          </span>
-        )}
-      </div>
-    )}
+                          {/* Rating / type / hours */}
+                          {(selectedBusiness.rating ||
+                            categoryLabel ||
+                            typeof selectedBusiness.openNow === 'boolean') && (
+                            <div
+                              style={{
+                                fontSize: '0.8rem',
+                                color: '#4b5563',
+                                marginTop: 4,
+                              }}
+                            >
+                              {selectedBusiness.rating && (
+                                <span>
+                                  ⭐ {selectedBusiness.rating.toFixed(1)}
+                                  {selectedBusiness.ratingCount
+                                    ? ` (${selectedBusiness.ratingCount})`
+                                    : ''}
+                                </span>
+                              )}
+                              {selectedBusiness.rating &&
+                                (categoryLabel ||
+                                  typeof selectedBusiness.openNow ===
+                                    'boolean') && <span>{' • '}</span>}
+                              {categoryLabel && (
+                                <span>{categoryLabel}</span>
+                              )}
+                              {categoryLabel &&
+                                typeof selectedBusiness.openNow ===
+                                  'boolean' && <span>{' • '}</span>}
+                              {typeof selectedBusiness.openNow ===
+                                'boolean' && (
+                                <span>
+                                  {selectedBusiness.openNow
+                                    ? 'Open now'
+                                    : 'Closed now'}
+                                </span>
+                              )}
+                            </div>
+                          )}
 
-    {/* Phone / website */}
-    {(selectedBusiness.phone || selectedBusiness.website) && (
-      <div
-        style={{
-          fontSize: '0.8rem',
-          color: '#4b5563',
-          marginTop: 4,
-        }}
-      >
-        {selectedBusiness.phone && (
-          <span>{selectedBusiness.phone}</span>
-        )}
-        {selectedBusiness.phone && selectedBusiness.website && (
-          <span>{' • '}</span>
-        )}
-        {selectedBusiness.website && (
-          <span>
-            {selectedBusiness.website.replace(/^https?:\/\//, '')}
-          </span>
-        )}
-      </div>
-    )}
+                          {/* Phone / website */}
+                          {(selectedBusiness.phone ||
+                            selectedBusiness.website) && (
+                            <div
+                              style={{
+                                fontSize: '0.8rem',
+                                color: '#4b5563',
+                                marginTop: 4,
+                              }}
+                            >
+                              {selectedBusiness.phone && (
+                                <span>{selectedBusiness.phone}</span>
+                              )}
+                              {selectedBusiness.phone &&
+                                selectedBusiness.website && (
+                                  <span>{' • '}</span>
+                                )}
+                              {selectedBusiness.website && (
+                                <span>
+                                  {selectedBusiness.website.replace(
+                                    /^https?:\/\//,
+                                    ''
+                                  )}
+                                </span>
+                              )}
+                            </div>
+                          )}
 
-    {/* Mini map */}
-    {selectedBusiness.lat &&
-      selectedBusiness.lng &&
-      import.meta.env.VITE_GOOGLE_MAPS_BROWSER_KEY && (
-        <div style={{ marginTop: 8 }}>
-          <img
-            src={`https://maps.googleapis.com/maps/api/staticmap?center=${selectedBusiness.lat},${selectedBusiness.lng}&zoom=15&size=600x250&markers=color:red|${selectedBusiness.lat},${selectedBusiness.lng}&key=${
-              import.meta.env.VITE_GOOGLE_MAPS_BROWSER_KEY
-            }`}
-            alt="Map preview"
-            style={{ width: '100%', borderRadius: 12 }}
-          />
-        </div>
-      )}
+                          {/* Mini map */}
+                          {selectedBusiness.lat &&
+                            selectedBusiness.lng &&
+                            import.meta.env.VITE_GOOGLE_MAPS_BROWSER_KEY && (
+                              <div style={{ marginTop: 8 }}>
+                                <img
+                                  src={`https://maps.googleapis.com/maps/api/staticmap?center=${selectedBusiness.lat},${selectedBusiness.lng}&zoom=15&size=600x250&markers=color:red|${selectedBusiness.lat},${selectedBusiness.lng}&key=${
+                                    import.meta.env
+                                      .VITE_GOOGLE_MAPS_BROWSER_KEY
+                                  }`}
+                                  alt="Map preview"
+                                  style={{ width: '100%', borderRadius: 12 }}
+                                />
+                              </div>
+                            )}
 
-    {/* Use this business button */}
-    <button
-      type="button"
-      onClick={() => handleSelectBusiness(selectedBusiness)}
-      style={{
-        width: '100%',
-        marginTop: 10,
-        minHeight: 40,
-        fontSize: '0.9rem',
-        fontWeight: 600,
-        borderRadius: 999,
-        border: 'none',
-        background: 'var(--navy)',
-        color: '#fff',
-        boxShadow: 'var(--shadow)',
-      }}
-    >
-      Use this business
-    </button>
-  </div>
-)}
-
+                          {/* Use this business button */}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleSelectBusiness(selectedBusiness)
+                            }
+                            style={{
+                              width: '100%',
+                              marginTop: 10,
+                              minHeight: 40,
+                              fontSize: '0.9rem',
+                              fontWeight: 600,
+                              borderRadius: 999,
+                              border: 'none',
+                              background: 'var(--navy)',
+                              color: '#fff',
+                              boxShadow: 'var(--shadow)',
+                            }}
+                          >
+                            Use this business
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     <button
@@ -959,4 +980,3 @@ if (bizList.length === 0) {
 }
 
 export default App
- 
