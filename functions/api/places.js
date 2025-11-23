@@ -1,5 +1,5 @@
 // functions/api/places.js
-// Uses Google Places API (New) - places:searchNearby
+// Very minimal Google Places API (New) - places:searchNearby
 
 export async function onRequest(context) {
   const { request, env } = context
@@ -21,12 +21,10 @@ export async function onRequest(context) {
   }
 
   try {
-    const placesUrl = 'https://places.googleapis.com/v1/places:searchNearby'
+    const endpoint = 'https://places.googleapis.com/v1/places:searchNearby'
 
-    // ✅ Places API (New) request body
-    // Use a valid type: "point_of_interest" instead of old "establishment"
+    // 🔹 Minimal body: just location + radius, no includedTypes
     const body = {
-      includedTypes: ['point_of_interest'],
       maxResultCount: 15,
       locationRestriction: {
         circle: {
@@ -39,13 +37,14 @@ export async function onRequest(context) {
       },
     }
 
-    const res = await fetch(placesUrl, {
+    const res = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'X-Goog-Api-Key': apiKey,
+        // 🔹 Very simple field mask; these are standard fields in the v1 Places response
         'X-Goog-FieldMask':
-          'places.id,places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri',
+          'places.id,places.displayName,places.formattedAddress',
       },
       body: JSON.stringify(body),
     })
@@ -70,8 +69,8 @@ export async function onRequest(context) {
       place_id: place.id,
       name: place.displayName?.text || '',
       address: place.formattedAddress || '',
-      phone: place.nationalPhoneNumber || null,
-      website: place.websiteUri || null,
+      phone: null,
+      website: null,
     }))
 
     return jsonResponse({ businesses })
