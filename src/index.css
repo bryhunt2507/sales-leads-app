@@ -1,5 +1,3 @@
-body { background: #ffe5e5 !important; }
-
 :root {
   --ink: #0f172a;
   --muted: #6b7280;
@@ -272,5 +270,75 @@ button.primary {
     font-size: 14px;
     min-height: 34px;
     padding: 8px 12px;
+  }
+}
+
+/* === Phone layout tuning (<= 480px) === */
+@media (max-width: 480px) {
+  main {
+    margin: 4px auto 8px;
+    padding: 6px 6px 12px;
+  }
+
+  .card {
+    padding: 10px 10px 14px;
+    border-radius: 14px;
+  }
+
+  h1 {
+    font-size: 18px;
+    margin: 4px 0 8px;
+    text-align: center;
+  }
+
+  .header-inner {
+    padding: 8px 10px;
+  }
+
+  .brand span {
+    font-size: 16px;
+  }
+
+  /* Top nav buttons (Home / Entry / Admin) */
+  header button {
+    padding: 6px 8px;
+    font-size: 13px;
+    min-height: 30px;
+    box-shadow: none;
+  }
+
+  label {
+    margin: 6px 0 2px;
+    font-size: 13px;
+  }
+
+  input,
+  select,
+  textarea {
+    padding: 8px 10px;
+    font-size: 14px;
+    min-height: 34px;
+  }
+
+  button {
+    padding: 8px 10px;
+    font-size: 14px;
+    min-height: 34px;
+    box-shadow: 0 3px 8px rgba(15, 44, 77, 0.18);
+  }
+
+  .row {
+    gap: 6px;
+  }
+
+  /* “Select Previous Call” / “Search Business Info” / “Scan Card” */
+  .card > div > button,
+  .card > button {
+    width: 100%;
+  }
+
+  .lead-card {
+    font-size: 0.8rem;
+    padding: 6px 8px;
   }
 }
