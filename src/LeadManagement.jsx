@@ -41,7 +41,7 @@ function LeadManagement({ organizationId }) {
           industry,
           created_at
         `)
-        //.eq('org_id', orgId)
+        .eq('org_id', orgId)
         .order('created_at', { ascending: false })
         .limit(200) // light for now
 
@@ -287,4 +287,4 @@ function LeadManagement({ organizationId }) {
     </div>
   )
 }
-export default LeadManagement
+export default LeadManagement 
