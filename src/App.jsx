@@ -581,36 +581,35 @@ const { data, error } = await supabase
   .select()
 
 
-    if (error) {
+        if (error) {
       console.error(error)
       setStatusMsg('error')
     } else {
       setStatusMsg('success')
       setForm({
-  company: '',
-  contact_name: '',
-  contact_title: '',
-  buying_role: '',
-  email: '',
-  phone: '',
-  ext: '',
-  website: '',
-  note: '',
-  call_type: '',
-  status: '',
-  rating: '',
-  industry: '',
-  latitude: '',
-  longitude: '',
-})
+        company: '',
+        contact_name: '',
+        contact_title: '',
+        buying_role: '',
+        email: '',
+        phone: '',
+        ext: '',
+        website: '',
+        note: '',
+        call_type: '',
+        status: '',
+        rating: '',
+        industry: '',
+        latitude: '',
+        longitude: '',
+      })
 
-
-      if (data && data.length > 0) {
-        setLeads(prev => [data[0], ...prev].slice(0, 20))
-      }
+      // Reload from Supabase so "Recent Leads" matches what's in the DB
+      await loadLeads()
     }
 
     setLoading(false)
+
   }
 
   return (
