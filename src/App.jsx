@@ -361,7 +361,7 @@ async function loadLeads() {
   const { data, error } = await supabase
     .from('leads')
     .select('*')
-    .eq('org_id', organizationId) // <- correct column
+    .eq('org_id', organizationId)          // ✅ correct column
     .order('created_at', { ascending: false })
     .limit(200)
 

@@ -231,44 +231,84 @@ button.primary {
 }
 
 /* === Mobile-tight layout overrides === */
-@media (max-width: 600px) {
+
+/* Base spacing (all sizes, but smaller than desktop) */
+main {
+  max-width: 820px;
+  width: 100%;
+  margin: 8px auto;
+  padding: 8px 10px 14px;
+}
+
+.card {
+  padding: 12px 12px 16px;
+  border-radius: 18px;
+}
+
+h1 {
+  margin: 4px 0 8px;
+  font-size: 19px;
+}
+
+label {
+  margin: 6px 0 3px;
+  font-size: 13px;
+}
+
+input,
+select,
+textarea {
+  padding: 8px 10px;
+  font-size: 14px;
+  min-height: 34px;
+}
+
+button {
+  padding: 10px 14px;
+  font-size: 14px;
+  min-height: 38px;
+  box-shadow: 0 4px 10px rgba(15, 44, 77, 0.18);
+}
+
+.row {
+  gap: 6px;
+}
+
+/* Extra-tight on small phones */
+@media (max-width: 480px) {
   main {
-    max-width: 100%;
-    margin: 6px auto;
-    padding: 8px 8px 14px;
+    margin-top: 4px;
+    padding: 6px 6px 12px;
   }
 
   .card {
+    border-radius: 14px;
     padding: 10px 10px 14px;
-    border-radius: 16px;
   }
 
   h1 {
-    margin: 4px 0 8px;
-    font-size: 18px;
+    font-size: 17px;
   }
 
-  label {
-    margin: 6px 0 3px;
-    font-size: 13px;
+  .header-inner {
+    padding: 8px 8px;
   }
 
-  input,
-  select,
-  textarea {
-    padding: 8px 10px;
-    font-size: 14px;
-    min-height: 34px;
+  .brand {
+    font-size: 16px;
+    gap: 8px;
   }
 
-  button {
-    padding: 8px 12px;
-    font-size: 14px;
-    min-height: 34px;
-    box-shadow: 0 3px 8px rgba(15, 44, 77, 0.18);
+  .brand-logo {
+    width: 26px;
+    height: 26px;
   }
 
-  .row {
-    gap: 6px;
+  /* Only shrink buttons inside the header nav */
+  header .header-inner button {
+    padding: 4px 8px;
+    font-size: 0.7rem;
+    min-height: 0;
+    box-shadow: none;
   }
 }
