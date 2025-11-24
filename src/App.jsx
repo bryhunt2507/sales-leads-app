@@ -29,6 +29,10 @@ function App() {
   const [organizationId, setOrganizationId] = useState(DEFAULT_ORGANIZATION_ID)
   const [authLoading, setAuthLoading] = useState(true)
 
+const [geofenceEnabled, setGeofenceEnabled] = useState(false)
+const [showPreviousCalls, setShowPreviousCalls] = useState(false)
+
+
   // 'home' | 'entry' | 'admin'
   const [view, setView] = useState('home')
   const [selectedBusiness, setSelectedBusiness] = useState(null)
@@ -42,19 +46,24 @@ function App() {
   const [industryOptions, setIndustryOptions] = useState([])
   const [loadingOptions, setLoadingOptions] = useState(true)
 
-  // Form state
   const [form, setForm] = useState({
-    company: '',
-    contact_name: '',
-    email: '',
-    phone: '',
-    note: '',
-    status: '',
-    rating: '',
-    industry: '',
-    latitude: '',
-    longitude: '',
-  })
+  company: '',
+  contact_name: '',
+  contact_title: '',
+  buying_role: '',
+  email: '',
+  phone: '',
+  ext: '',
+  website: '',
+  note: '',
+  call_type: '',   // UI-only for now, stored in business_info JSON
+  status: '',      // this will be "Lead Status" on screen
+  rating: '',
+  industry: '',
+  latitude: '',
+  longitude: '',
+})
+
 
   const [statusMsg, setStatusMsg] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -501,25 +510,33 @@ async function loadLeads() {
       return
     }
 
-    const { data, error } = await supabase
-      .from('leads')
-      .insert([
-        {
-          org_id: organizationId || DEFAULT_ORGANIZATION_ID,
-          company: form.company,
-          contact_name: form.contact_name,
-          email: form.email,
-          phone: form.phone,
-          note: form.note,
-          status: form.status,
-          rating: form.rating,
-          industry: form.industry,
-          latitude: form.latitude ? Number(form.latitude) : null,
-          longitude: form.longitude ? Number(form.longitude) : null,
-          location_source: form.latitude && form.longitude ? 'gps' : null,
-        },
-      ])
-      .select()
+    const phoneWithExt =
+  form.phone && form.ext ? `${form.phone} x${form.ext}` : form.phone || null
+
+const { data, error } = await supabase
+  .from('leads')
+  .insert([
+    {
+      org_id: organizationId || DEFAULT_ORGANIZATION_ID,
+      company: form.company,
+      contact_name: form.contact_name || null,
+      contact_title: form.contact_title || null,
+      buying_role: form.buying_role || null,
+      contact_email: form.email || null,
+      contact_phone: phoneWithExt,
+      website: form.website || null,
+      status: form.status || null,   // "Lead Status" on the UI
+      rating: form.rating || null,
+      industry: form.industry || null,
+      latitude: form.latitude ? Number(form.latitude) : null,
+      longitude: form.longitude ? Number(form.longitude) : null,
+      // store call_type in JSON so we don't need a new column yet
+      business_info: form.call_type
+        ? { call_type: form.call_type }
+        : null,
+    },
+  ])
+  .select()
 
     if (error) {
       console.error(error)
@@ -527,17 +544,23 @@ async function loadLeads() {
     } else {
       setStatusMsg('success')
       setForm({
-        company: '',
-        contact_name: '',
-        email: '',
-        phone: '',
-        note: '',
-        status: '',
-        rating: '',
-        industry: '',
-        latitude: '',
-        longitude: '',
-      })
+  company: '',
+  contact_name: '',
+  contact_title: '',
+  buying_role: '',
+  email: '',
+  phone: '',
+  ext: '',
+  website: '',
+  note: '',
+  call_type: '',
+  status: '',
+  rating: '',
+  industry: '',
+  latitude: '',
+  longitude: '',
+})
+
 
       if (data && data.length > 0) {
         setLeads(prev => [data[0], ...prev].slice(0, 20))
@@ -651,580 +674,525 @@ async function loadLeads() {
   ) : (
           <div className="card">
             {view === 'entry' ? (
-              <>
-                <h1>Sales Activity Entry</h1>
+  <>
+    <h1>Sales Activity Entry</h1>
 
-                {/* Scan card button (optional) */}
-                <button
-                  type="button"
-                  onClick={handleScanCard}
+    {/* TOP ACTION BAR: Select Previous Call + Search Business Info */}
+    <div
+      style={{
+        display: 'flex',
+        justifyContent: 'center',
+        gap: 16,
+        flexWrap: 'wrap',
+        marginBottom: 16,
+      }}
+    >
+      <button
+        type="button"
+        onClick={() => setShowPreviousCalls(prev => !prev)}
+        style={{
+          minWidth: 180,
+          background: '#0f2c4d',
+        }}
+      >
+        Select Previous Call
+      </button>
+
+      <button
+        type="button"
+        onClick={handleFindNearbyBusinesses}
+        style={{
+          minWidth: 180,
+          background: '#0f2c4d',
+        }}
+        disabled={loadingBusinesses}
+      >
+        {loadingBusinesses ? 'Searching…' : 'Search Business Info'}
+      </button>
+    </div>
+
+    {/* SCAN CARD BAR */}
+    <button
+      type="button"
+      onClick={handleScanCard}
+      style={{
+        width: '100%',
+        marginBottom: 18,
+        borderRadius: 999,
+        background: '#0f2c4d',
+      }}
+    >
+      Scan Card (Optional)
+    </button>
+
+    {/* MAIN FORM */}
+    <form onSubmit={handleSubmit}>
+      {/* CONTACT INFO ROW 1 */}
+      <div className="row">
+        <div>
+          <label>Company</label>
+          <input
+            name="company"
+            placeholder="Company Name (Required)"
+            value={form.company}
+            onChange={handleChange}
+          />
+        </div>
+        <div>
+          <label>Contact Name</label>
+          <input
+            name="contact_name"
+            placeholder="Contact Name"
+            value={form.contact_name}
+            onChange={handleChange}
+          />
+        </div>
+      </div>
+
+      {/* CONTACT INFO ROW 2 */}
+      <div className="row">
+        <div>
+          <label>Contact Title</label>
+          <input
+            name="contact_title"
+            placeholder="e.g., Operations Manager"
+            value={form.contact_title}
+            onChange={handleChange}
+          />
+        </div>
+        <div>
+          <label>Buying Role</label>
+          <input
+            name="buying_role"
+            placeholder="Gatekeeper, Decision Maker, etc."
+            value={form.buying_role}
+            onChange={handleChange}
+          />
+        </div>
+      </div>
+
+      {/* CONTACT INFO ROW 3 */}
+      <div className="row">
+        <div>
+          <label>Email Address</label>
+          <input
+            name="email"
+            placeholder="Email Address (Recommended)"
+            value={form.email}
+            onChange={handleChange}
+          />
+        </div>
+        <div>
+          <label>Phone Number</label>
+          <input
+            name="phone"
+            placeholder="(000) 000-0000"
+            value={form.phone}
+            onChange={handleChange}
+          />
+        </div>
+        <div>
+          <label>Extension (Optional)</label>
+          <input
+            name="ext"
+            placeholder="Ext"
+            value={form.ext}
+            onChange={handleChange}
+          />
+        </div>
+      </div>
+
+      {/* CONTACT INFO ROW 4 */}
+      <div className="row">
+        <div>
+          <label>Website</label>
+          <input
+            name="website"
+            placeholder="https://example.com"
+            value={form.website}
+            onChange={handleChange}
+          />
+        </div>
+      </div>
+
+      {/* COMMON NOTE ENTRY + CALL NOTE */}
+      <label>
+        Common Note Entries (Optional)
+        {/* For now a simple hard-coded list; later we can pull from a table */}
+        <select
+          onChange={e => {
+            const value = e.target.value
+            if (!value) return
+            setForm(prev => ({
+              ...prev,
+              note: prev.note ? `${prev.note}\n${value}` : value,
+            }))
+            e.target.value = ''
+          }}
+        >
+          <option value="">Select a common note</option>
+          <option value="Stopped by for a quick intro.">
+            Stopped by for a quick intro.
+          </option>
+          <option value="Left voicemail with callback number.">
+            Left voicemail with callback number.
+          </option>
+          <option value="Requested rate sheet and follow-up meeting.">
+            Requested rate sheet and follow-up meeting.
+          </option>
+        </select>
+      </label>
+
+      <label>
+        Call Note
+        <textarea
+          name="note"
+          placeholder="Note (Required)"
+          value={form.note}
+          onChange={handleChange}
+        />
+      </label>
+
+      {/* CALL DETAILS */}
+      <div className="section-title">Call Details</div>
+      <div className="section-divider" />
+
+      <label>
+        Call Type
+        {/* UI-only for now; stored in business_info JSON */}
+        <select
+          name="call_type"
+          value={form.call_type}
+          onChange={handleChange}
+        >
+          <option value="">Select Call Type</option>
+          <option value="Cold Call">Cold Call</option>
+          <option value="Follow-Up">Follow-Up</option>
+          <option value="On-Site Visit">On-Site Visit</option>
+          <option value="Virtual Meeting">Virtual Meeting</option>
+        </select>
+      </label>
+
+      <label>
+        Lead Status
+        <select
+          name="status"
+          value={form.status}
+          onChange={handleChange}
+        >
+          <option value="">
+            {loadingOptions ? 'Loading…' : 'Select Lead Status'}
+          </option>
+          {statusOptions.map(opt => (
+            <option key={opt.id} value={opt.label}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label>
+        Call Rating
+        <select
+          name="rating"
+          value={form.rating}
+          onChange={handleChange}
+        >
+          <option value="">
+            {loadingOptions ? 'Loading…' : 'Select Rating'}
+          </option>
+          {ratingOptions.map(opt => (
+            <option key={opt.id} value={opt.label}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label>
+        Industry
+        <select
+          name="industry"
+          value={form.industry}
+          onChange={handleChange}
+        >
+          <option value="">
+            {loadingOptions ? 'Loading…' : 'Industry (Required)'}
+          </option>
+          {industryOptions.map(opt => (
+            <option key={opt.id} value={opt.label}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      {/* LOCATION / NEARBY BUSINESSES */}
+      <div className="section-title">Location</div>
+      <div className="section-divider" />
+
+      {/* keep lat/lng hidden but still tracked */}
+      <div style={{ display: 'none' }}>
+        <input
+          name="latitude"
+          value={form.latitude}
+          onChange={handleChange}
+        />
+        <input
+          name="longitude"
+          value={form.longitude}
+          onChange={handleChange}
+        />
+      </div>
+
+      {locStatus && (
+        <div
+          className="helper"
+          style={{ marginTop: 8, marginBottom: 16 }}
+        >
+          {locStatus}
+        </div>
+      )}
+
+      <div
+        style={{
+          display: 'flex',
+          gap: 8,
+          flexWrap: 'wrap',
+          marginTop: 8,
+          marginBottom: 12,
+        }}
+      >
+        <button
+          type="button"
+          onClick={handleFindNearbyBusinesses}
+          style={{
+            flex: 1,
+            minWidth: 200,
+            background: 'var(--navy-2)',
+          }}
+          disabled={loadingBusinesses}
+        >
+          {loadingBusinesses
+            ? 'Searching nearby…'
+            : 'Find Nearby Businesses'}
+        </button>
+
+        <button
+          type="button"
+          style={{
+            flex: 1,
+            minWidth: 200,
+            background: '#0f2c4d',
+          }}
+          onClick={() => {
+            // stub for "Upload Additional Image(s)" – to be wired later
+            alert('Image upload coming soon (Supabase storage).')
+          }}
+        >
+          Upload Additional Image(s)
+        </button>
+
+        <button
+          type="button"
+          style={{
+            flex: 1,
+            minWidth: 200,
+            background: '#0f2c4d',
+          }}
+          onClick={() => {
+            // stub for "Add Extra Contact" – we’ll later tie into additional_contacts JSON
+            alert('Extra contact entry coming soon.')
+          }}
+        >
+          Add Extra Contact
+        </button>
+      </div>
+
+      <button
+        type="submit"
+        disabled={loading}
+        className="primary"
+        style={{ width: '100%', marginTop: 10 }}
+      >
+        {loading ? 'Saving…' : 'Submit'}
+      </button>
+
+      {statusMsg === 'success' && (
+        <p style={{ color: 'green', marginTop: 8 }}>Lead saved ✅</p>
+      )}
+      {statusMsg === 'error' && (
+        <p style={{ color: 'red', marginTop: 8 }}>
+          Something went wrong. Check console / Supabase settings.
+        </p>
+      )}
+    </form>
+  </>
+
+  {/* EXPANDING BUSINESS PICKER */}
+{showBusinessPicker && (
+  <div
+    style={{
+      position: 'fixed',
+      left: 0,
+      right: 0,
+      bottom: 0,
+      top: '30%',
+      background: 'rgba(15, 23, 42, 0.35)',
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'flex-end',
+      zIndex: 60,
+    }}
+    onClick={() => setShowBusinessPicker(false)}
+  >
+    <div
+      style={{
+        width: '100%',
+        maxWidth: 820,
+        margin: '0 auto',
+        background: '#fff',
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        boxShadow: '0 -10px 24px rgba(15,23,42,0.25)',
+        padding: 16,
+        maxHeight: '70%',
+        overflowY: 'auto',
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div
+        style={{
+          width: 40,
+          height: 4,
+          borderRadius: 999,
+          background: '#e5e7eb',
+          margin: '0 auto 8px',
+        }}
+      />
+
+      <h2 style={{ marginTop: 4, marginBottom: 8, fontSize: '1rem' }}>
+        Nearby Businesses
+      </h2>
+
+      {loadingBusinesses && <p>Searching nearby…</p>}
+      {!loadingBusinesses && businesses.length === 0 && (
+        <p className="helper">{businessError || 'No nearby businesses found.'}</p>
+      )}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {businesses.map((biz) => {
+          const isActive =
+            selectedBusiness && selectedBusiness.place_id === biz.place_id
+
+          return (
+            <div
+              key={biz.place_id}
+              style={{
+                borderRadius: 12,
+                border: '1px solid var(--border)',
+                background: isActive ? '#e5f0ff' : '#f9fafb',
+                padding: 8,
+              }}
+            >
+              {/* Row header */}
+              <button
+                type="button"
+                onClick={() => setSelectedBusiness(isActive ? null : biz)}
+                style={{
+                  width: '100%',
+                  textAlign: 'left',
+                  background: 'transparent',
+                  boxShadow: 'none',
+                  padding: 4,
+                  fontSize: '0.9rem',
+                  color: 'var(--ink)',
+                }}
+              >
+                <div style={{ fontWeight: 700 }}>
+                  {biz.name || biz.address}
+                </div>
+                {biz.address && (
+                  <div style={{ fontSize: '0.8rem', color: '#4b5563' }}>
+                    {biz.address}
+                  </div>
+                )}
+              </button>
+
+              {/* EXPANDED DETAILS */}
+              {isActive && (
+                <div
                   style={{
-                    width: '100%',
-                    marginBottom: 16,
-                    padding: '14px 16px',
-                    fontWeight: 600,
-                    borderRadius: 12,
-                    border: 'none',
-                    background: 'var(--navy)',
-                    color: 'white',
-                    fontSize: '1rem',
-                    boxShadow: 'var(--shadow)',
+                    marginTop: 6,
+                    borderTop: '1px solid #e5e7eb',
+                    paddingTop: 6,
+                    fontSize: '0.82rem',
                   }}
                 >
-                  📷 Scan Business Card (Optional)
-                </button>
-
-                {/* LEAD FORM */}
-                <form onSubmit={handleSubmit}>
-                  <div className="section-title">Contact Info</div>
-                  <div className="section-divider" />
-
-                  <label>
-                    Company (required)
-                    <input
-                      name="company"
-                      placeholder="Company Name"
-                      value={form.company}
-                      onChange={handleChange}
-                    />
-                  </label>
-
-                  <div className="row">
-                    <div>
-                      <label>
-                        Contact Name
-                        <input
-                          name="contact_name"
-                          placeholder="Contact Name"
-                          value={form.contact_name}
-                          onChange={handleChange}
-                        />
-                      </label>
+                  {(biz.rating || biz.category || biz.openNow) && (
+                    <div style={{ color: '#4b5563', marginBottom: 4 }}>
+                      {biz.rating && (
+                        <>
+                          ⭐ {biz.rating.toFixed(1)}
+                          {biz.ratingCount ? ` (${biz.ratingCount})` : ''}
+                        </>
+                      )}
                     </div>
-                    <div>
-                      <label>
-                        Phone Number
-                        <input
-                          name="phone"
-                          placeholder="(000) 000-0000"
-                          value={form.phone}
-                          onChange={handleChange}
-                        />
-                      </label>
-                    </div>
-                  </div>
+                  )}
 
-                  <div className="row">
-                    <div>
-                      <label>
-                        Email Address
-                        <input
-                          name="email"
-                          placeholder="Email Address"
-                          value={form.email}
-                          onChange={handleChange}
-                        />
-                      </label>
-                    </div>
-                  </div>
-
-                  <div className="section-title">Call Notes</div>
-                  <div className="section-divider" />
-
-                  <label>
-                    Call Note
-                    <textarea
-                      name="note"
-                      placeholder="Note (Required)"
-                      value={form.note}
-                      onChange={handleChange}
-                    />
-                  </label>
-
-                  <div className="section-title">Call Details</div>
-                  <div className="section-divider" />
-
-                  <label>
-                    Call Type / Status
-                    <select
-                      name="status"
-                      value={form.status}
-                      onChange={handleChange}
-                    >
-                      <option value="">
-                        {loadingOptions ? 'Loading…' : 'Select Call Type'}
-                      </option>
-                      {statusOptions.map(opt => (
-                        <option key={opt.id} value={opt.label}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label>
-                    Call Rating
-                    <select
-                      name="rating"
-                      value={form.rating}
-                      onChange={handleChange}
-                    >
-                      <option value="">
-                        {loadingOptions ? 'Loading…' : 'Select Rating'}
-                      </option>
-                      {ratingOptions.map(opt => (
-                        <option key={opt.id} value={opt.label}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label>
-                    Industry
-                    <select
-                      name="industry"
-                      value={form.industry}
-                      onChange={handleChange}
-                    >
-                      <option value="">
-                        {loadingOptions ? 'Loading…' : 'Select Industry'}
-                      </option>
-                      {industryOptions.map(opt => (
-                        <option key={opt.id} value={opt.label}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <div className="section-title">Location</div>
-                  <div className="section-divider" />
-
-                  {/* Hidden lat/long fields still stored in state & sent to Supabase */}
-                  <div style={{ display: 'none' }}>
-                    <input
-                      name="latitude"
-                      value={form.latitude}
-                      onChange={handleChange}
-                    />
-                    <input
-                      name="longitude"
-                      value={form.longitude}
-                      onChange={handleChange}
-                    />
-                  </div>
-
-                  {locStatus && (
-                    <div
-                      className="helper"
-                      style={{ marginTop: 8, marginBottom: 16 }}
-                    >
-                      {locStatus}
+                  {(biz.phone || biz.website) && (
+                    <div style={{ color: '#4b5563', marginBottom: 4 }}>
+                      {biz.phone}
+                      {biz.phone && biz.website && ' • '}
+                      {biz.website?.replace(/^https?:\/\//, '')}
                     </div>
                   )}
 
                   <button
                     type="button"
-                    onClick={handleFindNearbyBusinesses}
+                    onClick={() => {
+                      handleSelectBusiness(biz)
+                      setShowBusinessPicker(false)
+                    }}
                     style={{
                       width: '100%',
                       marginTop: 8,
-                      marginBottom: 4,
-                      padding: '12px 16px',
-                      borderRadius: 12,
-                      border: 'none',
+                      minHeight: 40,
+                      fontSize: '0.9rem',
                       fontWeight: 600,
-                      fontSize: '0.95rem',
-                      background: 'var(--navy-2)',
-                      color: 'white',
+                      borderRadius: 999,
+                      background: 'var(--navy)',
+                      color: '#fff',
                       boxShadow: 'var(--shadow)',
                     }}
-                    disabled={loadingBusinesses}
                   >
-                    {loadingBusinesses
-                      ? 'Searching nearby…'
-                      : 'Find Nearby Businesses'}
+                    Use this business
                   </button>
-
-                  {businessError && (
-                    <div
-                      className="helper"
-                      style={{
-                        marginTop: 4,
-                        marginBottom: 8,
-                        color: '#b91c1c',
-                      }}
-                    >
-                      {businessError}
-                    </div>
-                  )}
-
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="primary"
-                    style={{ width: '100%', marginTop: 20 }}
-                  >
-                    {loading ? 'Saving…' : 'Submit'}
-                  </button>
-
-                  {statusMsg === 'success' && (
-                    <p style={{ color: 'green', marginTop: 8 }}>
-                      Lead saved ✅
-                    </p>
-                  )}
-                  {statusMsg === 'error' && (
-                    <p style={{ color: 'red', marginTop: 8 }}>
-                      Something went wrong. Check console / Supabase settings.
-                    </p>
-                  )}
-                </form>
-
-                {/* RECENT LEADS */}
-                <div style={{ marginTop: 24 }}>
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      marginBottom: 8,
-                    }}
-                  >
-                    <span className="section-title" style={{ marginTop: 0 }}>
-                      Recent Leads
-                    </span>
-                    <button
-                      type="button"
-                      onClick={loadLeads}
-                      disabled={loadingLeads}
-                      style={{ fontSize: '0.8rem', padding: '6px 10px' }}
-                    >
-                      {loadingLeads ? 'Refreshing…' : 'Refresh'}
-                    </button>
-                  </div>
-
-                  {loadingLeads && <p>Loading…</p>}
-
-                  {!loadingLeads && leads.length === 0 && (
-                    <p className="helper">
-                      No leads yet. Add your first one above.
-                    </p>
-                  )}
-
-                  <div
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 6,
-                    }}
-                  >
-                    {leads.map(lead => (
-                      <div key={lead.id} className="lead-card">
-                        <strong>{lead.company}</strong>
-                        {lead.contact_name && <div>{lead.contact_name}</div>}
-                        {(lead.email || lead.phone) && (
-                          <div style={{ opacity: 0.8 }}>
-                            {lead.email && <span>{lead.email}</span>}
-                            {lead.email && lead.phone && <span> · </span>}
-                            {lead.phone && <span>{lead.phone}</span>}
-                          </div>
-                        )}
-                        {(lead.status ||
-                          lead.rating ||
-                          lead.industry) && (
-                          <div style={{ marginTop: 4, opacity: 0.9 }}>
-                            {lead.status && (
-                              <span>Status: {lead.status}</span>
-                            )}
-                            {lead.status &&
-                              (lead.rating || lead.industry) && (
-                                <span> · </span>
-                              )}
-                            {lead.rating && (
-                              <span>Rating: {lead.rating}</span>
-                            )}
-                            {lead.rating && lead.industry && (
-                              <span> · </span>
-                            )}
-                            {lead.industry && (
-                              <span>Industry: {lead.industry}</span>
-                            )}
-                          </div>
-                        )}
-                        {lead.latitude && lead.longitude && (
-                          <div style={{ marginTop: 4, opacity: 0.7 }}>
-                            📍 {lead.latitude}, {lead.longitude}
-                          </div>
-                        )}
-                        {lead.note && (
-                          <div style={{ marginTop: 4 }}>{lead.note}</div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
                 </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
 
-                {/* BUSINESS PICKER SHEET */}
-                {showBusinessPicker && (
-                  <div
-                    style={{
-                      position: 'fixed',
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      top: '30%',
-                      background: 'rgba(15, 23, 42, 0.35)',
-                      display: 'flex',
-                      justifyContent: 'center',
-                      alignItems: 'flex-end',
-                      zIndex: 60,
-                    }}
-                    onClick={() => setShowBusinessPicker(false)}
-                  >
-                    <div
-                      style={{
-                        width: '100%',
-                        maxWidth: 820,
-                        margin: '0 auto',
-                        background: '#fff',
-                        borderTopLeftRadius: 24,
-                        borderTopRightRadius: 24,
-                        boxShadow: '0 -10px 24px rgba(15,23,42,0.25)',
-                        padding: 16,
-                        maxHeight: '70%',
-                        overflowY: 'auto',
-                      }}
-                      onClick={e => e.stopPropagation()}
-                    >
-                      <div
-                        style={{
-                          width: 40,
-                          height: 4,
-                          borderRadius: 999,
-                          background: '#e5e7eb',
-                          margin: '0 auto 8px',
-                        }}
-                      />
-                      <h2
-                        style={{
-                          marginTop: 4,
-                          marginBottom: 8,
-                          fontSize: '1rem',
-                        }}
-                      >
-                        Nearby Businesses
-                      </h2>
-                      {loadingBusinesses && <p>Searching nearby…</p>}
-                      {!loadingBusinesses && businesses.length === 0 && (
-                        <p className="helper">
-                          {businessError || 'No nearby businesses found.'}
-                        </p>
-                      )}
-                      <div
-                        style={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: 8,
-                          marginTop: 4,
-                        }}
-                      >
-                        {businesses.map(biz => (
-                          <button
-                            key={biz.place_id}
-                            type="button"
-                            onClick={() => setSelectedBusiness(biz)}
-                            style={{
-                              textAlign: 'left',
-                              padding: 10,
-                              borderRadius: 12,
-                              border: '1px solid var(--border)',
-                              background:
-                                selectedBusiness &&
-                                selectedBusiness.place_id === biz.place_id
-                                  ? '#e5f0ff'
-                                  : '#f9fafb',
-                              boxShadow: 'none',
-                              minHeight: 0,
-                              fontSize: '0.9rem',
-                              color: 'var(--ink)',
-                            }}
-                          >
-                            <div style={{ fontWeight: 700 }}>
-                              {biz.name || biz.address}
-                            </div>
-                            {biz.address && (
-                              <div
-                                style={{
-                                  fontSize: '0.8rem',
-                                  color: '#4b5563',
-                                  marginTop: 2,
-                                }}
-                              >
-                                {biz.address}
-                              </div>
-                            )}
-                          </button>
-                        ))}
+      <button
+        type="button"
+        onClick={() => setShowBusinessPicker(false)}
+        style={{
+          width: '100%',
+          marginTop: 12,
+          minHeight: 40,
+          fontSize: '0.9rem',
+        }}
+      >
+        Close
+      </button>
+    </div>
+  </div>
+)}
 
-                        {selectedBusiness && (
-                          <div
-                            style={{
-                              marginTop: 12,
-                              paddingTop: 8,
-                              borderTop: '1px solid #e5e7eb',
-                            }}
-                          >
-                            {/* Name + address */}
-                            <div
-                              style={{
-                                fontWeight: 800,
-                                fontSize: '0.95rem',
-                              }}
-                            >
-                              {selectedBusiness.name ||
-                                selectedBusiness.address}
-                            </div>
-                            {selectedBusiness.address && (
-                              <div
-                                style={{
-                                  fontSize: '0.85rem',
-                                  color: '#4b5563',
-                                  marginTop: 2,
-                                }}
-                              >
-                                {selectedBusiness.address}
-                              </div>
-                            )}
-
-                            {/* Rating / type / hours */}
-                            {(selectedBusiness.rating ||
-                              categoryLabel ||
-                              typeof selectedBusiness.openNow ===
-                                'boolean') && (
-                              <div
-                                style={{
-                                  fontSize: '0.8rem',
-                                  color: '#4b5563',
-                                  marginTop: 4,
-                                }}
-                              >
-                                {selectedBusiness.rating && (
-                                  <span>
-                                    ⭐ {selectedBusiness.rating.toFixed(1)}
-                                    {selectedBusiness.ratingCount
-                                      ? ` (${selectedBusiness.ratingCount})`
-                                      : ''}
-                                  </span>
-                                )}
-                                {selectedBusiness.rating &&
-                                  (categoryLabel ||
-                                    typeof selectedBusiness.openNow ===
-                                      'boolean') && <span>{' • '}</span>}
-                                {categoryLabel && (
-                                  <span>{categoryLabel}</span>
-                                )}
-                                {categoryLabel &&
-                                  typeof selectedBusiness.openNow ===
-                                    'boolean' && <span>{' • '}</span>}
-                                {typeof selectedBusiness.openNow ===
-                                  'boolean' && (
-                                  <span>
-                                    {selectedBusiness.openNow
-                                      ? 'Open now'
-                                      : 'Closed now'}
-                                  </span>
-                                )}
-                              </div>
-                            )}
-
-                            {/* Phone / website */}
-                            {(selectedBusiness.phone ||
-                              selectedBusiness.website) && (
-                              <div
-                                style={{
-                                  fontSize: '0.8rem',
-                                  color: '#4b5563',
-                                  marginTop: 4,
-                                }}
-                              >
-                                {selectedBusiness.phone && (
-                                  <span>{selectedBusiness.phone}</span>
-                                )}
-                                {selectedBusiness.phone &&
-                                  selectedBusiness.website && (
-                                    <span>{' • '}</span>
-                                  )}
-                                {selectedBusiness.website && (
-                                  <span>
-                                    {selectedBusiness.website.replace(
-                                      /^https?:\/\//,
-                                      ''
-                                    )}
-                                  </span>
-                                )}
-                              </div>
-                            )}
-
-                            {/* Mini map */}
-                            {selectedBusiness.lat &&
-                              selectedBusiness.lng &&
-                              import.meta.env
-                                .VITE_GOOGLE_MAPS_BROWSER_KEY && (
-                                <div style={{ marginTop: 8 }}>
-                                  <img
-                                    src={`https://maps.googleapis.com/maps/api/staticmap?center=${selectedBusiness.lat},${selectedBusiness.lng}&zoom=15&size=600x250&markers=color:red|${selectedBusiness.lat},${selectedBusiness.lng}&key=${
-                                      import.meta.env
-                                        .VITE_GOOGLE_MAPS_BROWSER_KEY
-                                    }`}
-                                    alt="Map preview"
-                                    style={{ width: '100%', borderRadius: 12 }}
-                                  />
-                                </div>
-                              )}
-
-                            {/* Use this business button */}
-                            <button
-                              type="button"
-                              onClick={() =>
-                                handleSelectBusiness(selectedBusiness)
-                              }
-                              style={{
-                                width: '100%',
-                                marginTop: 10,
-                                minHeight: 40,
-                                fontSize: '0.9rem',
-                                fontWeight: 600,
-                                borderRadius: 999,
-                                border: 'none',
-                                background: 'var(--navy)',
-                                color: '#fff',
-                                boxShadow: 'var(--shadow)',
-                              }}
-                            >
-                              Use this business
-                            </button>
-                          </div>
-                        )}
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => setShowBusinessPicker(false)}
-                        style={{
-                          width: '100%',
-                          marginTop: 12,
-                          minHeight: 40,
-                          fontSize: '0.9rem',
-                        }}
-                      >
-                        Close
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </>
-            ) : isAdmin ? (
+) : isAdmin ? (
+  // ... existing AdminOptions block
               <AdminOptions
                 organizationId={organizationId || DEFAULT_ORGANIZATION_ID}
                 statusOptions={statusOptions}
