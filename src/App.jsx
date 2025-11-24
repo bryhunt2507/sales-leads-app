@@ -41,10 +41,16 @@ const [showPreviousCalls, setShowPreviousCalls] = useState(false)
   const CARD_OCR_ENDPOINT = '/api/ocr'
 
   // Dropdown options
-  const [statusOptions, setStatusOptions] = useState([])
+    const [statusOptions, setStatusOptions] = useState([])
   const [ratingOptions, setRatingOptions] = useState([])
   const [industryOptions, setIndustryOptions] = useState([])
+
+  // NEW:
+  const [buyingRoleOptions, setBuyingRoleOptions] = useState([])
+  const [callTypeOptions, setCallTypeOptions] = useState([])
+
   const [loadingOptions, setLoadingOptions] = useState(true)
+
 
   const [form, setForm] = useState({
   company: '',
@@ -278,25 +284,50 @@ const [showPreviousCalls, setShowPreviousCalls] = useState(false)
   }
 
   // Load dropdown options for the current organization
+    // Load dropdown options for the current organization
   async function loadOptionLists() {
     if (!organizationId) return
     setLoadingOptions(true)
 
-    const [statusRes, ratingRes, industryRes] = await Promise.all([
+    const [
+      statusRes,
+      ratingRes,
+      industryRes,
+      buyingRes,
+      callTypeRes,
+    ] = await Promise.all([
       supabase
         .from('call_status_options')
         .select('*')
         .eq('organization_id', organizationId)
         .eq('active', true)
         .order('sort_order', { ascending: true }),
+
       supabase
         .from('rating_options')
         .select('*')
         .eq('organization_id', organizationId)
         .eq('active', true)
         .order('sort_order', { ascending: true }),
+
       supabase
         .from('industry_options')
+        .select('*')
+        .eq('organization_id', organizationId)
+        .eq('active', true)
+        .order('sort_order', { ascending: true }),
+
+      // NEW – Buying roles
+      supabase
+        .from('buying_role_options')
+        .select('*')
+        .eq('organization_id', organizationId)
+        .eq('active', true)
+        .order('sort_order', { ascending: true }),
+
+      // NEW – Call types
+      supabase
+        .from('call_type_options')
         .select('*')
         .eq('organization_id', organizationId)
         .eq('active', true)
@@ -307,13 +338,20 @@ const [showPreviousCalls, setShowPreviousCalls] = useState(false)
     if (ratingRes.error) console.error('Rating options error:', ratingRes.error)
     if (industryRes.error)
       console.error('Industry options error:', industryRes.error)
+    if (buyingRes.error)
+      console.error('Buying role options error:', buyingRes.error)
+    if (callTypeRes.error)
+      console.error('Call type options error:', callTypeRes.error)
 
     if (!statusRes.error && statusRes.data) setStatusOptions(statusRes.data)
     if (!ratingRes.error && ratingRes.data) setRatingOptions(ratingRes.data)
     if (!industryRes.error && industryRes.data) setIndustryOptions(industryRes.data)
+    if (!buyingRes.error && buyingRes.data) setBuyingRoleOptions(buyingRes.data)
+    if (!callTypeRes.error && callTypeRes.data) setCallTypeOptions(callTypeRes.data)
 
     setLoadingOptions(false)
   }
+
 
   // Load leads (used by the phone app side)
 async function loadLeads() {
@@ -530,13 +568,18 @@ const { data, error } = await supabase
       industry: form.industry || null,
       latitude: form.latitude ? Number(form.latitude) : null,
       longitude: form.longitude ? Number(form.longitude) : null,
-      // store call_type in JSON so we don't need a new column yet
-      business_info: form.call_type
-        ? { call_type: form.call_type }
-        : null,
+      business_info:
+        form.call_type || form.note
+          ? {
+              call_type: form.call_type || null,
+              note: form.note || null,
+              source: 'phone_app_v1',
+            }
+          : null,
     },
   ])
   .select()
+
 
     if (error) {
       console.error(error)
@@ -760,15 +803,24 @@ const { data, error } = await supabase
             onChange={handleChange}
           />
         </div>
-        <div>
+                <div>
           <label>Buying Role</label>
-          <input
+          <select
             name="buying_role"
-            placeholder="Gatekeeper, Decision Maker, etc."
             value={form.buying_role}
             onChange={handleChange}
-          />
+          >
+            <option value="">
+              {loadingOptions ? 'Loading…' : 'Select Buying Role'}
+            </option>
+            {buyingRoleOptions.map(opt => (
+              <option key={opt.id} value={opt.label}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
         </div>
+
       </div>
 
       {/* CONTACT INFO ROW 3 */}
@@ -857,21 +909,24 @@ const { data, error } = await supabase
       <div className="section-title">Call Details</div>
       <div className="section-divider" />
 
-      <label>
+            <label>
         Call Type
-        {/* UI-only for now; stored in business_info JSON */}
         <select
           name="call_type"
           value={form.call_type}
           onChange={handleChange}
         >
-          <option value="">Select Call Type</option>
-          <option value="Cold Call">Cold Call</option>
-          <option value="Follow-Up">Follow-Up</option>
-          <option value="On-Site Visit">On-Site Visit</option>
-          <option value="Virtual Meeting">Virtual Meeting</option>
+          <option value="">
+            {loadingOptions ? 'Loading…' : 'Select Call Type'}
+          </option>
+          {callTypeOptions.map(opt => (
+            <option key={opt.id} value={opt.label}>
+              {opt.label}
+            </option>
+          ))}
         </select>
       </label>
+
 
       <label>
         Lead Status
@@ -963,20 +1018,7 @@ const { data, error } = await supabase
           marginBottom: 12,
         }}
       >
-        <button
-          type="button"
-          onClick={handleFindNearbyBusinesses}
-          style={{
-            flex: 1,
-            minWidth: 200,
-            background: 'var(--navy-2)',
-          }}
-          disabled={loadingBusinesses}
-        >
-          {loadingBusinesses
-            ? 'Searching nearby…'
-            : 'Find Nearby Businesses'}
-        </button>
+
 
         <button
           type="button"
