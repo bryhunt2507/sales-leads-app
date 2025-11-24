@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { supabase } from './supabaseClient'
 
 // Fallback org if nothing is passed in yet
-const DEFAULT_ORG_ID = 'a0a50cfb-f1e9-4515-8176-61e2625350d9'
+const DEFAULT_ORG_ID = '53f11d6b-1874-479f-9f27-ea3d27787d7f'
 
 function LeadManagement({ organizationId }) {
   const orgId = organizationId || DEFAULT_ORG_ID
