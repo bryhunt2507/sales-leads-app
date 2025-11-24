@@ -1,6 +1,7 @@
 // src/MainHome.jsx
 import React, { useState } from 'react'
 import './MainHome.css'
+import LeadManagement from './LeadManagement.jsx'
 
 export default function MainHome({ organizationId }) {
 
@@ -9,6 +10,8 @@ export default function MainHome({ organizationId }) {
 
   // Which report view is selected inside Home
   const [activeView, setActiveView] = useState('dispatch')
+  const [salesView, setSalesView] = useState('overview') // 'overview' | 'leadManagement' | ...
+
 
   // Fake calendar items for now – wire real data later
   const calendarItems = [
@@ -193,21 +196,74 @@ export default function MainHome({ organizationId }) {
   }
 
   function renderSalesSection() {
-    return (
-      <section className="card big-card">
-        <h2 className="card-title">Sales Workspace</h2>
-        <p className="meta">
-          This is where we’ll stack sales dashboards, pipeline, and your phone
-          app lead entry like a NetSuite-style bundle.
-        </p>
-        <ul className="bullet-list">
-          <li>Sales pipeline by stage</li>
-          <li>Key accounts & opportunities</li>
-          <li>Lead entry / call logging (phone app embed)</li>
-        </ul>
-      </section>
-    )
-  }
+  return (
+    <section className="card big-card">
+      <h2 className="card-title">Sales Workspace</h2>
+      <p className="meta">
+        This is where we’ll stack sales dashboards, pipeline, and your phone
+        app lead entry like a NetSuite-style bundle.
+      </p>
+
+      {/* PILL ROW – like your old Apps Script CRM */}
+      <div className="btn-row" style={{ marginTop: 12, marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+        <button
+          type="button"
+          className={`btn ${salesView === 'overview' ? 'blue' : ''}`}
+          onClick={() => setSalesView('overview')}
+        >
+          Overview
+        </button>
+
+        <button
+          type="button"
+          className={`btn ${salesView === 'leadManagement' ? 'green' : ''}`}
+          onClick={() => setSalesView('leadManagement')}
+        >
+          Lead Management
+        </button>
+
+        {/* Stub pills for future tools */}
+        <button
+          type="button"
+          className="btn"
+          onClick={() => alert('TODO: Daily Call Log screen')}
+        >
+          Daily Calls
+        </button>
+        <button
+          type="button"
+          className="btn"
+          onClick={() => alert('TODO: Route Planner screen')}
+        >
+          Route Planner
+        </button>
+        <button
+          type="button"
+          className="btn"
+          onClick={() => alert('TODO: Email Contact screen')}
+        >
+          Email Contact
+        </button>
+      </div>
+
+      {/* AREA THAT CHANGES BASED ON WHICH PILL IS ACTIVE */}
+      <div style={{ marginTop: 8 }}>
+        {salesView === 'overview' && (
+          <ul className="bullet-list">
+            <li>Sales pipeline by stage</li>
+            <li>Key accounts & opportunities</li>
+            <li>Lead entry / call logging (phone app embed)</li>
+          </ul>
+        )}
+
+        {salesView === 'leadManagement' && (
+          <LeadManagement organizationId={organizationId} />
+        )}
+      </div>
+    </section>
+  )
+}
+
 
   function renderRecruitingSection() {
     return (
