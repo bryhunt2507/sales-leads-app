@@ -4,149 +4,231 @@ import { supabase } from './supabaseClient'
 
 export default function EnterpriseSignup() {
   const [companyName, setCompanyName] = useState('')
-  const [domain, setDomain] = useState('')
-  const [adminEmail, setAdminEmail] = useState('')
+  const [companyDomain, setCompanyDomain] = useState('')
+  const [primaryAdminEmail, setPrimaryAdminEmail] = useState('')
+  const [status, setStatus] = useState(null)
   const [loading, setLoading] = useState(false)
-  const [message, setMessage] = useState(null)
 
   async function handleSubmit(e) {
     e.preventDefault()
-    setMessage(null)
+    setStatus(null)
 
-    if (!companyName || !domain || !adminEmail) {
-      setMessage('Please fill in all fields.')
-      return
-    }
-
-    const cleanDomain = domain.replace('@', '').trim().toLowerCase()
-
-    if (!adminEmail.toLowerCase().endsWith(`@${cleanDomain}`)) {
-      setMessage(`Admin email must use the ${cleanDomain} domain.`)
+    if (!companyName || !companyDomain || !primaryAdminEmail) {
+      setStatus('Please fill in all fields.')
       return
     }
 
     setLoading(true)
 
-    // 1. Create company
-    const { data: company, error: companyError } = await supabase
-      .from('companies')
-      .insert([{ company_name: companyName, primary_domain: cleanDomain }])
-      .select()
-      .single()
+    try {
+      // 1) Create company row
+      const { data: company, error: companyError } = await supabase
+        .from('companies')
+        .insert([
+          {
+            company_name: companyName,
+            primary_domain: companyDomain,
+          },
+        ])
+        .select()
+        .single()
 
-    if (companyError) {
-      console.error(companyError)
-      setMessage('Error creating company.')
-      setLoading(false)
-      return
-    }
+      if (companyError) {
+        console.error('Company insert error', companyError)
+        setStatus('Error creating company. Check console.')
+        setLoading(false)
+        return
+      }
 
-    // 2. Create a default organization for this company
-    const { data: org, error: orgError } = await supabase
-      .from('organizations')
-      .insert([
-        {
-          company_id: company.id,
-          name: `${companyName} - Main`,
+      // 2) Create organization row linked to company
+      const { data: org, error: orgError } = await supabase
+        .from('organizations')
+        .insert([
+          {
+            name: `${companyName} - Main`,
+            company_id: company.id,
+          },
+        ])
+        .select()
+        .single()
+
+      if (orgError) {
+        console.error('Organization insert error', orgError)
+        setStatus('Company created, but error creating organization.')
+        setLoading(false)
+        return
+      }
+
+      // 3) Upsert profile for the primary admin
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .upsert(
+          {
+            email: primaryAdminEmail,
+            organization_id: org.id,
+            role: 'owner',
+          },
+          { onConflict: 'email' }
+        )
+
+      if (profileError) {
+        console.error('Profile upsert error', profileError)
+        setStatus('Org created, but error saving admin profile.')
+        setLoading(false)
+        return
+      }
+
+      // 4) Send magic link to primary admin
+      const redirectUrl =
+        typeof window !== 'undefined' ? window.location.origin : undefined
+
+      const { error: authError } = await supabase.auth.signInWithOtp({
+        email: primaryAdminEmail,
+        options: {
+          emailRedirectTo: redirectUrl,
         },
-      ])
-      .select()
-      .single()
+      })
 
-    if (orgError) {
-      console.error(orgError)
-      setMessage('Company created, but error creating organization.')
-      setLoading(false)
-      return
-    }
+      if (authError) {
+        console.error('Auth magic-link error', authError)
+        setStatus(
+          'Company & org created, profile saved, but error sending sign-in link.'
+        )
+        setLoading(false)
+        return
+      }
 
-    // 3. Send magic link to the owner
-    const { error: authError } = await supabase.auth.signInWithOtp({
-      email: adminEmail,
-    })
-
-    // 4. Save profile / owner role
-    const { error: profileError } = await supabase.from('profiles').upsert(
-      [
-        {
-          email: adminEmail,
-          role: 'owner', // enterprise-level role
-          company_id: company.id,
-          organization_id: org.id,
-        },
-      ],
-      { onConflict: 'email', returning: 'minimal' }
-    )
-
-    if (authError) {
-      console.error(authError)
-      setMessage('Error sending sign-in link.')
-    } else if (profileError) {
-      console.error(profileError)
-      setMessage('Sign-in link sent, but error saving profile.')
-    } else {
-      setMessage('✅ Company created and sign-in link sent to the owner.')
+      setStatus(
+        `Company created and sign-in link sent to ${primaryAdminEmail}.`
+      )
       setCompanyName('')
-      setDomain('')
-      setAdminEmail('')
+      setCompanyDomain('')
+      setPrimaryAdminEmail('')
+    } catch (err) {
+      console.error('Enterprise setup error', err)
+      setStatus('Unexpected error creating company. Check console.')
+    } finally {
+      setLoading(false)
     }
-
-    setLoading(false)
   }
 
   return (
-    <main style={{ maxWidth: 720, margin: '40px auto', padding: 16 }}>
-      <div className="card">
-        <h1 style={{ textAlign: 'center', marginBottom: 12 }}>
-          CRM Staffing – Enterprise Setup
+    <div
+      style={{
+        minHeight: '100vh',
+        background: '#0b1628',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24,
+      }}
+    >
+      <div
+        style={{
+          maxWidth: 720,
+          width: '100%',
+          background: 'white',
+          borderRadius: 32,
+          padding: 32,
+          boxShadow: '0 24px 60px rgba(15,23,42,0.35)',
+        }}
+      >
+        <h1
+          style={{
+            fontSize: '2.2rem',
+            marginBottom: 8,
+            fontWeight: 800,
+            color: '#111827',
+          }}
+        >
+          CRM Staffing — Enterprise Setup
         </h1>
-        <p className="helper" style={{ textAlign: 'center' }}>
-          Create your company account, set the business domain, and send a secure
-          sign-in link to the first admin user.
+        <p style={{ marginBottom: 24, color: '#4b5563' }}>
+          Create your company account, set the business email domain, and send a
+          secure sign-in link to the first admin user.
         </p>
 
-        <form onSubmit={handleSubmit} style={{ marginTop: 20 }}>
-          <label>
-            Company Name
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontWeight: 600 }}>Company Name</span>
             <input
+              type="text"
               value={companyName}
               onChange={e => setCompanyName(e.target.value)}
-              placeholder="LaborMax Staffing"
+              placeholder="LaborMax – Main Branch"
+              style={{
+                padding: '10px 12px',
+                borderRadius: 10,
+                border: '1px solid #d1d5db',
+                fontSize: '0.95rem',
+              }}
             />
           </label>
 
-          <label>
-            Company Email Domain
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontWeight: 600 }}>Company Email Domain</span>
             <input
-              value={domain}
-              onChange={e => setDomain(e.target.value)}
+              type="text"
+              value={companyDomain}
+              onChange={e => setCompanyDomain(e.target.value)}
               placeholder="labormaxstaffing.com"
+              style={{
+                padding: '10px 12px',
+                borderRadius: 10,
+                border: '1px solid #d1d5db',
+                fontSize: '0.95rem',
+              }}
             />
           </label>
 
-          <label>
-            Primary Admin Email
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontWeight: 600 }}>Primary Admin Email</span>
             <input
-              value={adminEmail}
-              onChange={e => setAdminEmail(e.target.value)}
-              placeholder="owner@labormaxstaffing.com"
+              type="email"
+              value={primaryAdminEmail}
+              onChange={e => setPrimaryAdminEmail(e.target.value)}
+              placeholder="you@company.com"
+              style={{
+                padding: '10px 12px',
+                borderRadius: 10,
+                border: '1px solid #d1d5db',
+                fontSize: '0.95rem',
+              }}
             />
           </label>
 
           <button
             type="submit"
             disabled={loading}
-            className="primary"
-            style={{ width: '100%', marginTop: 20 }}
+            style={{
+              marginTop: 8,
+              padding: '12px 18px',
+              borderRadius: 999,
+              border: 'none',
+              background: '#16a34a',
+              color: 'white',
+              fontWeight: 700,
+              fontSize: '1rem',
+              cursor: 'pointer',
+              boxShadow: '0 8px 20px rgba(22,163,74,0.35)',
+            }}
           >
-            {loading ? 'Creating…' : 'Create Company & Send Link'}
+            {loading ? 'Creating company…' : 'Create Company & Send Link'}
           </button>
+
+          {status && (
+            <p style={{ marginTop: 8, color: '#374151', fontSize: '0.9rem' }}>
+              {status}
+            </p>
+          )}
         </form>
 
-        {message && (
-          <p style={{ marginTop: 12, fontSize: '0.9rem' }}>{message}</p>
-        )}
+        <p style={{ marginTop: 24, fontSize: '0.85rem', color: '#6b7280' }}>
+          You&apos;re on the <code>admin</code> entry point. This page will
+          become the full &quot;Create Company + Domain + First Admin&quot;
+          flow for multi-tenant accounts.
+        </p>
       </div>
-    </main>
+    </div>
   )
 }
