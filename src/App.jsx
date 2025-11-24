@@ -1027,8 +1027,8 @@ const { data, error } = await supabase
         </p>
       )}
     </form>
-  </>
 
+            
   {/* EXPANDING BUSINESS PICKER */}
 {showBusinessPicker && (
   <div
@@ -1190,7 +1190,7 @@ const { data, error } = await supabase
     </div>
   </div>
 )}
-
+</>
 ) : isAdmin ? (
   // ... existing AdminOptions block
               <AdminOptions
