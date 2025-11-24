@@ -2,7 +2,8 @@
 import React, { useState } from 'react'
 import './MainHome.css'
 
-export default function MainHome() {
+export default function MainHome({ organizationId }) {
+
   // Top-level CRM sections (tabs)
   const [section, setSection] = useState('home') // 'home' | 'sales' | 'recruiting' | 'tasks' | 'reports'
 

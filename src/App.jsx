@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
 import AdminOptions from './AdminOptions.jsx'
 import MainHome from './MainHome.jsx'
+import LeadManagement from './LeadManagement.jsx'
+
 
 async function fileToBase64(file) {
   return new Promise((resolve, reject) => {
@@ -304,26 +306,27 @@ function App() {
     setLoadingOptions(false)
   }
 
-  // Load leads
-  async function loadLeads() {
-    if (!organizationId) return
-    setLoadingLeads(true)
+  // Load leads (used by the phone app side)
+async function loadLeads() {
+  if (!organizationId) return
+  setLoadingLeads(true)
 
-    const { data, error } = await supabase
-      .from('leads')
-      .select('*')
-      .eq('organization_id', organizationId)
-      .order('created_at', { ascending: false })
-      .limit(20)
+  const { data, error } = await supabase
+    .from('leads')
+    .select('*')
+    .eq('org_id', organizationId) // <- correct column
+    .order('created_at', { ascending: false })
+    .limit(200)
 
-    if (error) {
-      console.error('Error loading leads:', error)
-    } else {
-      setLeads(data || [])
-    }
-
-    setLoadingLeads(false)
+  if (error) {
+    console.error('Error loading leads:', error)
+  } else {
+    setLeads(data || [])
   }
+
+  setLoadingLeads(false)
+}
+
 
   // Get GPS location once
   function autoGetLocation() {
@@ -643,9 +646,9 @@ function App() {
       </header>
 
       <main>
-        {view === 'home' ? (
-          <MainHome />
-        ) : (
+  {view === 'home' ? (
+    <MainHome organizationId={organizationId} />
+  ) : (
           <div className="card">
             {view === 'entry' ? (
               <>
@@ -1239,4 +1242,4 @@ function App() {
   )
 }
 
-export default App
+export default App 
