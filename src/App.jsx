@@ -20,7 +20,7 @@ async function fileToBase64(file) {
 }
 
 // Default org for now (your existing org)
-const DEFAULT_ORGANIZATION_ID = 'a0a50cfb-f1e9-4515-8176-61e2625350d9'
+const DEFAULT_ORGANIZATION_ID = '53f11d6b-1874-479f-9f27-ea3d27787d7f'
 
 function App() {
   // Auth / profile / organization
