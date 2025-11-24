@@ -505,7 +505,7 @@ async function loadLeads() {
       .from('leads')
       .insert([
         {
-          organization_id: organizationId || DEFAULT_ORGANIZATION_ID,
+          org_id: organizationId || DEFAULT_ORGANIZATION_ID,
           company: form.company,
           contact_name: form.contact_name,
           email: form.email,
