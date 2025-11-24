@@ -83,7 +83,7 @@ export async function onRequest(context) {
       lng: place.location?.longitude ?? null,
       rating: place.rating ?? null,
       ratingCount: place.userRatingCount ?? null,
-      category: place.primaryTypeDisplayName || null,
+      category: place.primaryTypeDisplayName?.text || null,
       openNow: place.currentOpeningHours?.openNow ?? null,
     }))
 
