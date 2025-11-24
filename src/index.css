@@ -229,3 +229,60 @@ button.primary {
   padding: 8px 12px;
   font-size: 0.9rem;
 }
+
+/* === Mobile-tight layout overrides === */
+
+main {
+  max-width: 820px;
+  width: 100%;
+  margin: 10px auto;
+  padding: 10px 10px 18px;
+}
+
+.card {
+  padding: 14px 14px 18px;
+  border-radius: 18px;
+}
+
+h1 {
+  margin: 4px 0 10px;
+  font-size: 20px;
+}
+
+label {
+  margin: 8px 0 4px;
+  font-size: 14px;
+}
+
+input,
+select,
+textarea {
+  padding: 10px 12px;
+  font-size: 15px;
+  min-height: 38px;
+}
+
+button {
+  padding: 10px 14px;
+  font-size: 15px;
+  min-height: 40px;
+  box-shadow: 0 4px 10px rgba(15, 44, 77, 0.18);
+}
+
+.row {
+  gap: 8px;
+}
+
+@media (max-width: 480px) {
+  main {
+    margin-top: 6px;
+  }
+
+  .card {
+    border-radius: 16px;
+  }
+
+  h1 {
+    font-size: 18px;
+  }
+}
