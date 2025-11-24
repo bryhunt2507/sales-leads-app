@@ -299,21 +299,21 @@ const [showPreviousCalls, setShowPreviousCalls] = useState(false)
       supabase
         .from('call_status_options')
         .select('*')
-        .eq('organization_id', organizationId)
+        .eq('org_id', organizationId)  // ✅ matches your leads table
         .eq('active', true)
         .order('sort_order', { ascending: true }),
 
       supabase
         .from('rating_options')
         .select('*')
-        .eq('organization_id', organizationId)
+        .eq('org_id', organizationId)  // ✅ matches your leads table
         .eq('active', true)
         .order('sort_order', { ascending: true }),
 
       supabase
         .from('industry_options')
         .select('*')
-        .eq('organization_id', organizationId)
+        .eq('org_id', organizationId)  // ✅ matches your leads table
         .eq('active', true)
         .order('sort_order', { ascending: true }),
 
@@ -321,7 +321,7 @@ const [showPreviousCalls, setShowPreviousCalls] = useState(false)
       supabase
         .from('buying_role_options')
         .select('*')
-        .eq('organization_id', organizationId)
+        .eq('org_id', organizationId)  // ✅ matches your leads table
         .eq('active', true)
         .order('sort_order', { ascending: true }),
 
@@ -329,7 +329,7 @@ const [showPreviousCalls, setShowPreviousCalls] = useState(false)
       supabase
         .from('call_type_options')
         .select('*')
-        .eq('organization_id', organizationId)
+        .eq('org_id', organizationId)  // ✅ matches your leads table
         .eq('active', true)
         .order('sort_order', { ascending: true }),
     ])
