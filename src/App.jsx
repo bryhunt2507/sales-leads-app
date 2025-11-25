@@ -322,6 +322,8 @@ function App() {
                 statusOptions={statusOptions}
                 ratingOptions={ratingOptions}
                 industryOptions={industryOptions}
+                buyingRoleOptions={buyingRoleOptions}
+                callTypeOptions={callTypeOptions}
                 reloadOptions={() => loadOptionLists(organizationId)}
               />
             ) : (

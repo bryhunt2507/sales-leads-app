@@ -6,11 +6,15 @@ function AdminOptions({
   statusOptions,
   ratingOptions,
   industryOptions,
+  buyingRoleOptions,
+  callTypeOptions,
   reloadOptions,
 }) {
   const [newStatus, setNewStatus] = useState('')
   const [newRating, setNewRating] = useState('')
   const [newIndustry, setNewIndustry] = useState('')
+  const [newBuyingRole, setNewBuyingRole] = useState('')
+  const [newCallType, setNewCallType] = useState('')
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState(null)
 
@@ -383,6 +387,24 @@ function AdminOptions({
         industryOptions,
         newIndustry,
         setNewIndustry
+      )}
+
+      {renderList(
+        'Buying Role Options',
+        'buying_role',
+        'buying_role_options',
+        buyingRoleOptions,
+        newBuyingRole,
+        setNewBuyingRole
+      )}
+
+      {renderList(
+        'Call Type Options',
+        'call_type',
+        'call_type_options',
+        callTypeOptions,
+        newCallType,
+        setNewCallType
       )}
 
       <div style={{ marginTop: 32 }}>
