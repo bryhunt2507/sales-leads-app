@@ -1,3 +1,4 @@
+// src/SalesEntryForm.jsx
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from './supabaseClient'
 
@@ -23,6 +24,7 @@ function distanceInMeters(lat1, lon1, lat2, lon2) {
  * - organizationId: uuid
  * - currentUserId: uuid (auth.user.id)
  * - statusOptions, ratingOptions, industryOptions, buyingRoleOptions, callTypeOptions: rows from option tables
+ * - commonNoteOptions (optional): [{ id, label, value }]
  */
 function SalesEntryForm({
   organizationId,
@@ -32,6 +34,7 @@ function SalesEntryForm({
   industryOptions,
   buyingRoleOptions,
   callTypeOptions,
+  commonNoteOptions = [],
 }) {
   // ---- GEO / PREVIOUS CALLS ----
   const [geofenceEnabled, setGeofenceEnabled] = useState(true)
@@ -57,11 +60,13 @@ function SalesEntryForm({
   const [industry, setIndustry] = useState('')
   const [status, setStatus] = useState('')
   const [rating, setRating] = useState('')
+  const [callType, setCallType] = useState('')
   const [note, setNote] = useState('')
   const [followUpDate, setFollowUpDate] = useState('')
+  const [selectedCommonNote, setSelectedCommonNote] = useState('')
 
-  const [imageFile, setImageFile] = useState(null) // stub for future OCR
-  const [imageUrl, setImageUrl] = useState('') // future: Supabase Storage or R2
+  const [imageFile, setImageFile] = useState(null)
+  const [imageLabel, setImageLabel] = useState('') // simple “Card selected” text
 
   const [selectedLead, setSelectedLead] = useState(null) // { id, ... }
 
@@ -71,7 +76,6 @@ function SalesEntryForm({
   const [submitError, setSubmitError] = useState(null)
 
   // ========== GEOLOCATION ==========
-
   useEffect(() => {
     if (!geofenceEnabled) return
     if (!navigator.geolocation) {
@@ -100,11 +104,11 @@ function SalesEntryForm({
   }, [geofenceEnabled])
 
   // ========== LOAD PREVIOUS CALLS (NEARBY) ==========
-
   const loadPreviousCalls = useCallback(async () => {
     if (!organizationId) return
     if (!coords) {
       setPreviousCallsError('Location not available yet.')
+      setShowPreviousCalls(true)
       return
     }
 
@@ -113,7 +117,6 @@ function SalesEntryForm({
     setPreviousCallsError(null)
 
     try {
-      // Pull a limited batch of leads w/ coords for this org, then filter in JS.
       const { data, error } = await supabase
         .from('leads')
         .select(
@@ -168,7 +171,6 @@ function SalesEntryForm({
   }, [organizationId, coords])
 
   // ========== HELPERS ==========
-
   function resetFormFields() {
     setCompany('')
     setContactName('')
@@ -180,10 +182,12 @@ function SalesEntryForm({
     setIndustry('')
     setStatus('')
     setRating('')
+    setCallType('')
     setNote('')
     setFollowUpDate('')
+    setSelectedCommonNote('')
     setImageFile(null)
-    setImageUrl('')
+    setImageLabel('')
     setSelectedLead(null)
   }
 
@@ -196,7 +200,6 @@ function SalesEntryForm({
     setIndustry(lead.industry || '')
     setStatus(lead.status || '')
     setRating(lead.rating || '')
-    // keep website, contactTitle, buyingRole as-is (might be blank in legacy)
   }
 
   function formatDistanceFeet(meters) {
@@ -220,11 +223,21 @@ function SalesEntryForm({
     return parts.join(' • ')
   }
 
-  // ========== SEARCH BUSINESS INFO (STUB) ==========
+  // Common note dropdown → append to note
+  function handleCommonNoteChange(e) {
+    const val = e.target.value
+    setSelectedCommonNote(val)
+    if (!val) return
 
+    const toAppend =
+      (commonNoteOptions.find((o) => o.value === val) ||
+        commonNoteOptions.find((o) => o.label === val) || { label: val }).label
+
+    setNote((prev) => (prev ? `${prev} ${toAppend}` : toAppend))
+  }
+
+  // ========== SEARCH BUSINESS INFO (STUB) ==========
   async function handleSearchBusinessInfo() {
-    // In the legacy app this hits getSuggestedBusinesses (Google Places).
-    // For now we show a stub so the button does *something*.
     setSuggestedMessage(null)
 
     if (!coords) {
@@ -234,7 +247,6 @@ function SalesEntryForm({
 
     setLoadingSuggested(true)
     try {
-      // TODO: wire to Supabase edge function or Cloudflare Worker calling Places API
       setSuggestedMessage(
         'Business suggestions will come from Google Places here (not wired yet in this version).',
       )
@@ -243,8 +255,24 @@ function SalesEntryForm({
     }
   }
 
-  // ========== SUBMIT HANDLER ==========
+  // ========== SCAN CARD BUTTON ==========
+  function handleScanCardClick() {
+    const input = document.getElementById('scanCardInput')
+    if (input) input.click()
+  }
 
+  function handleCardFileChange(e) {
+    const file = e.target.files?.[0]
+    if (!file) {
+      setImageFile(null)
+      setImageLabel('')
+      return
+    }
+    setImageFile(file)
+    setImageLabel(file.name || 'Card image selected')
+  }
+
+  // ========== SUBMIT ==========
   async function handleSubmit(e) {
     e.preventDefault()
     setSubmitting(true)
@@ -258,6 +286,7 @@ function SalesEntryForm({
         date: ts,
         status: status || null,
         rating: rating || null,
+        call_type: callType || null,
         note: note || '',
         user_id: currentUserId || null,
       }
@@ -266,15 +295,14 @@ function SalesEntryForm({
         date: ts,
         noteType: status || null,
         text: note || '',
+        followUpDate: followUpDate || null,
         enteredByUserId: currentUserId || null,
       }
 
       if (selectedLead) {
-        // UPDATE EXISTING LEAD (follow-up)
         const existingCalls = Array.isArray(selectedLead.call_history)
           ? selectedLead.call_history
           : []
-
         const newCalls = [...existingCalls, callRecord]
 
         const { error } = await supabase
@@ -290,22 +318,14 @@ function SalesEntryForm({
             industry: industry || null,
             status: status || null,
             rating: rating || null,
-            note_history: supabase.rpc
-              ? undefined
-              : undefined, // we’ll just overwrite below
             call_history: newCalls,
             updated_at: ts,
           })
           .eq('id', selectedLead.id)
 
-        // If you want to append note_history too, you can fetch + append first.
-        // Keeping it simple for now: we only update call_history and the surface fields.
-
         if (error) throw error
-
         setSubmitMessage('Follow-up saved to existing lead.')
       } else {
-        // CREATE NEW LEAD
         const payload = {
           org_id: organizationId,
           company: company || null,
@@ -325,7 +345,7 @@ function SalesEntryForm({
           longitude: coords?.lng ?? null,
           location_raw:
             coords != null ? `${coords.lat},${coords.lng}` : null,
-          primary_image_url: imageUrl || null,
+          primary_image_url: null, // later: Supabase Storage URL
           call_history: [callRecord],
           note_history: [noteRecord],
           created_at: ts,
@@ -333,8 +353,8 @@ function SalesEntryForm({
         }
 
         const { error } = await supabase.from('leads').insert(payload)
-
         if (error) throw error
+
         setSubmitMessage('New lead saved. Ready for the next entry.')
         resetFormFields()
       }
@@ -347,9 +367,8 @@ function SalesEntryForm({
   }
 
   // ========== RENDER ==========
-
   return (
-    <div className="card">
+    <div>
       {/* Title */}
       <h1>Sales Activity Entry</h1>
 
@@ -374,7 +393,17 @@ function SalesEntryForm({
       )}
 
       {/* Top action buttons */}
-      <div className="top-actions" style={{ marginTop: 10, marginBottom: 10 }}>
+      <div
+        className="top-actions"
+        style={{
+          marginTop: 12,
+          marginBottom: 8,
+          display: 'flex',
+          gap: 8,
+          flexWrap: 'wrap',
+          justifyContent: 'center',
+        }}
+      >
         <button
           type="button"
           onClick={loadPreviousCalls}
@@ -384,14 +413,38 @@ function SalesEntryForm({
         </button>
         <button
           type="button"
-          className="scan-btn"
-          style={{ marginLeft: 8 }}
           onClick={handleSearchBusinessInfo}
           disabled={loadingSuggested}
         >
           {loadingSuggested ? 'Searching…' : 'Search Business Info'}
         </button>
       </div>
+
+      {/* Scan Card button bar */}
+      <button
+        type="button"
+        onClick={handleScanCardClick}
+        style={{
+          width: '100%',
+          marginBottom: 10,
+          background: 'var(--navy)',
+          borderRadius: 9999,
+        }}
+      >
+        Scan Card (Optional)
+      </button>
+      <input
+        id="scanCardInput"
+        type="file"
+        accept="image/*"
+        style={{ display: 'none' }}
+        onChange={handleCardFileChange}
+      />
+      {imageLabel && (
+        <div className="helper" style={{ marginTop: 2, marginBottom: 4 }}>
+          {imageLabel}
+        </div>
+      )}
 
       {/* Status banners */}
       {loadingPreviousCalls && (
@@ -405,12 +458,18 @@ function SalesEntryForm({
         </div>
       )}
       {submitMessage && (
-        <div className="status-banner status-success" style={{ marginBottom: 6 }}>
+        <div
+          className="status-banner status-success"
+          style={{ marginBottom: 6, color: '#166534' }}
+        >
           {submitMessage}
         </div>
       )}
       {(submitError || previousCallsError) && (
-        <div className="status-banner" style={{ marginBottom: 6, color: '#b91c1c' }}>
+        <div
+          className="status-banner"
+          style={{ marginBottom: 6, color: '#b91c1c' }}
+        >
           {submitError || previousCallsError}
         </div>
       )}
@@ -446,7 +505,9 @@ function SalesEntryForm({
                     • {formatDistanceFeet(lead.distance_m)}
                   </span>
                 </div>
-                {(lead.contact_name || lead.contact_phone || lead.contact_email) && (
+                {(lead.contact_name ||
+                  lead.contact_phone ||
+                  lead.contact_email) && (
                   <div style={{ fontSize: '0.8rem', color: '#4b5563' }}>
                     {lead.contact_name && <span>{lead.contact_name}</span>}
                     {lead.contact_phone && (
@@ -459,7 +520,11 @@ function SalesEntryForm({
                 )}
                 {lead.call_history && (
                   <div
-                    style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: 2 }}
+                    style={{
+                      fontSize: '0.75rem',
+                      color: '#6b7280',
+                      marginTop: 2,
+                    }}
                   >
                     {lastCallSummary(lead.call_history)}
                   </div>
@@ -481,52 +546,82 @@ function SalesEntryForm({
         {/* Company + contact row */}
         <div className="row">
           <div>
-            <label htmlFor="company">Company</label>
+            <label htmlFor="company">Company (Required)</label>
             <input
               id="company"
               type="text"
               value={company}
               onChange={(e) => setCompany(e.target.value)}
-              placeholder="Business name"
+              placeholder="Company Name"
+              required
             />
           </div>
           <div>
-            <label htmlFor="contactName">Contact</label>
+            <label htmlFor="contactName">Contact Name</label>
             <input
               id="contactName"
               type="text"
               value={contactName}
               onChange={(e) => setContactName(e.target.value)}
-              placeholder="Contact person"
+              placeholder="Contact Name"
             />
           </div>
         </div>
 
-        {/* Email + phone row */}
+        {/* Title + buying role */}
         <div className="row">
           <div>
-            <label htmlFor="contactEmail">Email</label>
+            <label htmlFor="contactTitle">Contact Title</label>
+            <input
+              id="contactTitle"
+              type="text"
+              value={contactTitle}
+              onChange={(e) => setContactTitle(e.target.value)}
+              placeholder="e.g., Operations Manager"
+            />
+          </div>
+          <div>
+            <label htmlFor="buyingRole">Buying Role</label>
+            <select
+              id="buyingRole"
+              value={buyingRole}
+              onChange={(e) => setBuyingRole(e.target.value)}
+            >
+              <option value="">Select Buying Role</option>
+              {buyingRoleOptions.map((opt) => (
+                <option key={opt.id} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Email + phone */}
+        <div className="row">
+          <div>
+            <label htmlFor="contactEmail">Email Address</label>
             <input
               id="contactEmail"
               type="email"
               value={contactEmail}
               onChange={(e) => setContactEmail(e.target.value)}
-              placeholder="contact@example.com"
+              placeholder="Email Address (Recommended)"
             />
           </div>
           <div>
-            <label htmlFor="contactPhone">Phone</label>
+            <label htmlFor="contactPhone">Phone Number</label>
             <input
               id="contactPhone"
               type="tel"
               value={contactPhone}
               onChange={(e) => setContactPhone(e.target.value)}
-              placeholder="(555) 555-5555"
+              placeholder="(000) 000-0000"
             />
           </div>
         </div>
 
-        {/* Website + title + buying role */}
+        {/* Website */}
         <div className="row">
           <div>
             <label htmlFor="website">Website</label>
@@ -535,30 +630,78 @@ function SalesEntryForm({
               type="text"
               value={website}
               onChange={(e) => setWebsite(e.target.value)}
-              placeholder="https://…"
-            />
-          </div>
-          <div>
-            <label htmlFor="contactTitle">Contact Title</label>
-            <input
-              id="contactTitle"
-              type="text"
-              value={contactTitle}
-              onChange={(e) => setContactTitle(e.target.value)}
-              placeholder="Owner, HR Manager, etc."
+              placeholder="https://example.com"
             />
           </div>
         </div>
+
+        {/* Common Note Entries dropdown */}
+        <div>
+          <label htmlFor="commonNoteSelect">
+            Common Note Entries (Optional)
+          </label>
+          <select
+            id="commonNoteSelect"
+            value={selectedCommonNote}
+            onChange={handleCommonNoteChange}
+          >
+            <option value="">Select a common note</option>
+            {commonNoteOptions.length === 0 && (
+              <>
+                <option value="Left voicemail">Left voicemail</option>
+                <option value="Spoke with gatekeeper">
+                  Spoke with gatekeeper
+                </option>
+                <option value="Requested quote">Requested quote</option>
+              </>
+            )}
+            {commonNoteOptions.map((opt) => (
+              <option key={opt.id || opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Call Note */}
+        <label htmlFor="note">Call Note (Required)</label>
+        <textarea
+          id="note"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="Note (Required)"
+          required
+        />
+
+        {/* Call Type, Status, Industry */}
         <div className="row">
           <div>
-            <label htmlFor="buyingRole">Buying Role</label>
+            <label htmlFor="callType">Call Type</label>
             <select
-              id="buyingRole"
-              value={buyingRole}
-              onChange={(e) => setBuyingRole(e.target.value)}
+              id="callType"
+              value={callType}
+              onChange={(e) => setCallType(e.target.value)}
             >
-              <option value="">Select buying role…</option>
-              {buyingRoleOptions.map((opt) => (
+              <option value="">Select Call Type</option>
+              {callTypeOptions.map((opt) => (
+                <option key={opt.id} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="row">
+          <div>
+            <label htmlFor="status">Call Status</label>
+            <select
+              id="status"
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+            >
+              <option value="">Select Call Status</option>
+              {statusOptions.map((opt) => (
                 <option key={opt.id} value={opt.value}>
                   {opt.label}
                 </option>
@@ -566,13 +709,14 @@ function SalesEntryForm({
             </select>
           </div>
           <div>
-            <label htmlFor="industry">Industry</label>
+            <label htmlFor="industry">Industry (Required)</label>
             <select
               id="industry"
               value={industry}
               onChange={(e) => setIndustry(e.target.value)}
+              required
             >
-              <option value="">Select industry…</option>
+              <option value="">Industry (Required)</option>
               {industryOptions.map((opt) => (
                 <option key={opt.id} value={opt.value}>
                   {opt.label}
@@ -582,86 +726,20 @@ function SalesEntryForm({
           </div>
         </div>
 
-        {/* Status / Rating / Follow-up */}
+        {/* Follow-up date */}
         <div className="row">
           <div>
-            <label htmlFor="status">Status / Call Type</label>
-            <select
-              id="status"
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-            >
-              <option value="">Select status…</option>
-              {statusOptions.map((opt) => (
-                <option key={opt.id} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label htmlFor="rating">Rating</label>
-            <select
-              id="rating"
-              value={rating}
-              onChange={(e) => setRating(e.target.value)}
-            >
-              <option value="">Select rating…</option>
-              {ratingOptions.map((opt) => (
-                <option key={opt.id} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Follow-up date (optional) */}
-        <div className="row">
-          <div>
-            <label htmlFor="followUpDate">Follow-up date (optional)</label>
+            <label htmlFor="followUpDate">Follow-up Date (Optional)</label>
             <input
               id="followUpDate"
               type="date"
               value={followUpDate}
               onChange={(e) => setFollowUpDate(e.target.value)}
             />
-            <div className="helper">
-              For now this is stored only in the note history payload; we can
-              wire it to a dedicated column later.
-            </div>
           </div>
         </div>
 
-        {/* Notes */}
-        <label htmlFor="note">Call notes</label>
-        <textarea
-          id="note"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          placeholder="What happened on this call? Any commitments or follow-ups?"
-        />
-
-        {/* Scan card (stub) */}
-        <div className="section-title">Business card (optional)</div>
-        <div className="section-divider" />
-        <div className="row">
-          <div>
-            <label htmlFor="cardCapture">Upload card image</label>
-            <input
-              id="cardCapture"
-              type="file"
-              accept="image/*"
-              onChange={(e) => setImageFile(e.target.files?.[0] || null)}
-            />
-            <div className="helper">
-              In the old app this triggered OCR. Here we’ll later hook this to
-              Supabase Storage + OCR. For now it’s just stored in memory.
-            </div>
-          </div>
-        </div>
-
-        {/* Submit */}
+        {/* Bottom buttons (Submit + Clear) */}
         <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
           <button
             type="submit"
@@ -672,7 +750,7 @@ function SalesEntryForm({
               ? 'Saving…'
               : selectedLead
               ? 'Save Follow-up'
-              : 'Submit New Lead'}
+              : 'Submit'}
           </button>
           <button
             type="button"
