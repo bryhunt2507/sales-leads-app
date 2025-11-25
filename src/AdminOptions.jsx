@@ -17,45 +17,41 @@ function AdminOptions({ organizationId }) {
   const [newIndustry, setNewIndustry] = useState('')
 
   // ---- LOAD OPTIONS FOR THIS ORG ----
-  async function loadOptions(orgId) {
-    if (!orgId) return
-    setLoading(true)
-    setMessage(null)
-    setError(null)
+async function loadOptions(orgId) {
+  setLoading(true)
+  setMessage(null)
+  setError(null)
 
-    try {
-      const [statusRes, ratingRes, industryRes] = await Promise.all([
-        supabase
-          .from('call_status_options')
-          .select('*')
-          .eq('organization_id', orgId)
-          .order('sort_order', { ascending: true }),
-        supabase
-          .from('rating_options')
-          .select('*')
-          .eq('organization_id', orgId)
-          .order('sort_order', { ascending: true }),
-        supabase
-          .from('industry_options')
-          .select('*')
-          .eq('organization_id', orgId)
-          .order('sort_order', { ascending: true }),
-      ])
+  try {
+    const [statusRes, ratingRes, industryRes] = await Promise.all([
+      supabase
+        .from('call_status_options')
+        .select('*')
+        .order('sort_order', { ascending: true }),
+      supabase
+        .from('rating_options')
+        .select('*')
+        .order('sort_order', { ascending: true }),
+      supabase
+        .from('industry_options')
+        .select('*')
+        .order('sort_order', { ascending: true }),
+    ])
 
-      if (statusRes.error) throw statusRes.error
-      if (ratingRes.error) throw ratingRes.error
-      if (industryRes.error) throw industryRes.error
+    if (statusRes.error) throw statusRes.error
+    if (ratingRes.error) throw ratingRes.error
+    if (industryRes.error) throw industryRes.error
 
-      setStatusOptions(statusRes.data || [])
-      setRatingOptions(ratingRes.data || [])
-      setIndustryOptions(industryRes.data || [])
-    } catch (err) {
-      console.error('Error loading admin options', err)
-      setError(err.message || 'Error loading options.')
-    } finally {
-      setLoading(false)
-    }
+    setStatusOptions(statusRes.data || [])
+    setRatingOptions(ratingRes.data || [])
+    setIndustryOptions(industryRes.data || [])
+  } catch (err) {
+    console.error('Error loading admin options', err)
+    setError(err.message || 'Error loading options.')
+  } finally {
+    setLoading(false)
   }
+}
 
   useEffect(() => {
     if (organizationId) {
