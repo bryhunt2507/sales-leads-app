@@ -156,12 +156,6 @@ textarea:focus {
   flex: 1;
 }
 
-@media (max-width: 640px) {
-  .row {
-    flex-direction: column;
-  }
-}
-
 /* ===== Buttons ===== */
 button {
   -webkit-appearance: none;
@@ -229,121 +223,7 @@ button.primary {
   font-size: 0.85rem;
 }
 
-/* Extra-tight on very small phones */
-@media (max-width: 480px) {
-  .header-inner {
-    padding: 6px 8px;
-  }
-
-  .brand {
-    font-size: 16px;
-  }
-
-  main {
-    padding: 6px 8px 12px;
-    margin: 6px auto 12px;
-  }
-
-  .card {
-    border-radius: 16px;
-    padding: 10px 10px 14px;
-  }
-
-  h1 {
-    font-size: 18px;
-    margin: 2px 0 8px;
-  }
-
-  label {
-    font-size: 13px;
-  }
-
-  input,
-  select,
-  textarea {
-    font-size: 14px;
-    min-height: 34px;
-    padding: 8px 10px;
-  }
-
-  button {
-    font-size: 14px;
-    min-height: 34px;
-    padding: 8px 12px;
-  }
-}
-
-/* === Phone layout tuning (<= 480px) === */
-@media (max-width: 480px) {
-  main {
-    margin: 4px auto 8px;
-    padding: 6px 6px 12px;
-  }
-
-  .card {
-    padding: 10px 10px 14px;
-    border-radius: 14px;
-  }
-
-  h1 {
-    font-size: 18px;
-    margin: 4px 0 8px;
-    text-align: center;
-  }
-
-  .header-inner {
-    padding: 8px 10px;
-  }
-
-  .brand span {
-    font-size: 16px;
-  }
-
-  /* Top nav buttons (Home / Entry / Admin) */
-  header button {
-    padding: 6px 8px;
-    font-size: 13px;
-    min-height: 30px;
-    box-shadow: none;
-  }
-
-  label {
-    margin: 6px 0 2px;
-    font-size: 13px;
-  }
-
-  input,
-  select,
-  textarea {
-    padding: 8px 10px;
-    font-size: 14px;
-    min-height: 34px;
-  }
-
-  button {
-    padding: 8px 10px;
-    font-size: 14px;
-    min-height: 34px;
-    box-shadow: 0 3px 8px rgba(15, 44, 77, 0.18);
-  }
-
-  .row {
-    gap: 6px;
-  }
-
-  /* “Select Previous Call” / “Search Business Info” / “Scan Card” */
-  .card > div > button,
-  .card > button {
-    width: 100%;
-  }
-
-  .lead-card {
-    font-size: 0.8rem;
-    padding: 6px 8px;
-  }
-}
-
-/* ===== Previous calls inline list ===== */
+/* ==== Previous calls inline list ==== */
 .prev-calls {
   margin-bottom: 12px;
 }
@@ -371,7 +251,6 @@ button.primary {
   border: 1px solid var(--border);
   padding: 6px 10px;
   background: #f9fafb;
-  cursor: pointer;
   text-align: left;
 }
 
@@ -389,10 +268,133 @@ button.primary {
   font-weight: 700;
 }
 
-/* On very small phones keep it tight */
+/* ========= Base responsive tweaks ========= */
+
+@media (max-width: 640px) {
+  .row {
+    flex-direction: column;
+  }
+}
+
+/* Extra-tight on very small phones */
 @media (max-width: 480px) {
-  .prev-call-item {
+  /* Overall spacing */
+  main {
+    margin: 4px auto 8px;
+    padding: 6px 6px 10px;
+  }
+
+  .card {
+    border-radius: 16px;
+    padding: 8px 8px 12px;
+  }
+
+  /* Header tightening */
+  .header-inner {
     padding: 6px 8px;
+  }
+
+  /* second header-inner row (nav) gets even less padding */
+  header .header-inner:nth-of-type(2) {
+    padding-top: 2px;
+    padding-bottom: 4px;
+    justify-content: center;
+  }
+
+  .brand {
+    font-size: 16px;
+  }
+
+  .user-badge {
+    font-size: 0.75rem;
+    padding: 3px 6px;
+  }
+
+  /* Top nav (CRM Main / Sales Entry / Admin) */
+  header button {
+    padding: 4px 8px;
+    font-size: 12px;
+    min-height: 26px;
+    box-shadow: none;
+  }
+
+  /* Screen title */
+  h1 {
+    font-size: 18px;
+    margin: 4px 0 6px;
+    text-align: center;
+  }
+
+  /* Labels & fields */
+  label {
+    margin: 4px 0 2px;
+    font-size: 13px;
+  }
+
+  input,
+  select,
+  textarea {
+    padding: 7px 9px;
+    font-size: 14px;
+    min-height: 32px;
+  }
+
+  textarea {
+    min-height: 70px;
+  }
+
+  /* Buttons in the form */
+  button {
+    font-size: 14px;
+    min-height: 34px;
+    padding: 7px 10px;
+    box-shadow: 0 3px 8px rgba(15, 44, 77, 0.18);
+  }
+
+  /* Top actions: Select Previous / Search Business */
+  .top-actions {
+    margin-top: 8px;
+    margin-bottom: 6px;
+    display: flex;
+    flex-direction: row;
+    gap: 6px;
+  }
+
+  .top-actions button {
+    flex: 1;
+    font-size: 13px;
+    min-height: 32px;
+  }
+
+  /* Scan card button full width but compact */
+  .top-actions + button {
+    margin-bottom: 6px;
+    min-height: 32px;
+    font-size: 13px;
+  }
+
+  .section-title {
+    margin-top: 10px;
+    margin-bottom: 4px;
+    font-size: 0.8rem;
+  }
+
+  .section-divider {
+    margin: 3px 0 8px;
+  }
+
+  .helper {
+    font-size: 0.75rem;
+  }
+
+  .row {
+    gap: 6px;
+  }
+
+  /* Previous call cards */
+  .lead-card,
+  .prev-call-item {
+    padding: 5px 8px;
   }
 
   .prev-call-main {
