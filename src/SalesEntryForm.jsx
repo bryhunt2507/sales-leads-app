@@ -517,9 +517,11 @@ function SalesEntryForm({
             </p>
           )}
 
-          {!loadingPreviousCalls && previousCalls.length === 0 && !previousCallsError && (
-            <p className="helper">No recent nearby calls found.</p>
-          )}
+          {!loadingPreviousCalls &&
+            previousCalls.length === 0 &&
+            !previousCallsError && (
+              <p className="helper">No recent nearby calls found.</p>
+            )}
 
           {!loadingPreviousCalls && previousCalls.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -576,7 +578,10 @@ function SalesEntryForm({
 
       {/* Business suggestions list */}
       {businessSuggestions.length > 0 && (
-        <div className="card business-suggestions-panel" style={{ marginBottom: 10 }}>
+        <div
+          className="card business-suggestions-panel"
+          style={{ marginBottom: 10 }}
+        >
           <div className="section-title">Nearby businesses</div>
           {bizError && (
             <p className="helper" style={{ color: '#b91c1c' }}>
@@ -588,7 +593,10 @@ function SalesEntryForm({
               {suggestedMessage}
             </p>
           )}
-          <ul className="business-suggestions-list" style={{ listStyle: 'none', paddingLeft: 0, margin: 0 }}>
+          <ul
+            className="business-suggestions-list"
+            style={{ listStyle: 'none', paddingLeft: 0, margin: 0 }}
+          >
             {businessSuggestions.map((biz) => (
               <li
                 key={biz.placeId || biz.name}
@@ -688,7 +696,10 @@ function SalesEntryForm({
             >
               <option value="">Select Buying Role</option>
               {buyingRoleOptions.map((opt) => (
-                <option key={opt.id} value={opt.value}>
+                <option
+                  key={opt.id}
+                  value={opt.value || opt.label}
+                >
                   {opt.label}
                 </option>
               ))}
@@ -755,7 +766,10 @@ function SalesEntryForm({
               </>
             )}
             {commonNoteOptions.map((opt) => (
-              <option key={opt.id || opt.value} value={opt.value}>
+              <option
+                key={opt.id || opt.value || opt.label}
+                value={opt.value || opt.label}
+              >
                 {opt.label}
               </option>
             ))}
@@ -783,7 +797,10 @@ function SalesEntryForm({
             >
               <option value="">Select Call Type</option>
               {callTypeOptions.map((opt) => (
-                <option key={opt.id} value={opt.value}>
+                <option
+                  key={opt.id}
+                  value={opt.value || opt.label}
+                >
                   {opt.label}
                 </option>
               ))}
@@ -801,7 +818,10 @@ function SalesEntryForm({
             >
               <option value="">Select Call Status</option>
               {statusOptions.map((opt) => (
-                <option key={opt.id} value={opt.value}>
+                <option
+                  key={opt.id}
+                  value={opt.value || opt.label}
+                >
                   {opt.label}
                 </option>
               ))}
@@ -817,7 +837,10 @@ function SalesEntryForm({
             >
               <option value="">Industry (Required)</option>
               {industryOptions.map((opt) => (
-                <option key={opt.id} value={opt.value}>
+                <option
+                  key={opt.id}
+                  value={opt.value || opt.label}
+                >
                   {opt.label}
                 </option>
               ))}
