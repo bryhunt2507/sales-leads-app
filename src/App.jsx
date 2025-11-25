@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
 import AdminOptions from './AdminOptions.jsx'
 import MainHome from './MainHome.jsx'
-import LeadManagement from './LeadManagement.jsx'
 import SalesEntryForm from './SalesEntryForm.jsx'
 
 // Fallback org if nothing is resolved from profile yet
@@ -17,9 +16,8 @@ function App() {
   const [authLoading, setAuthLoading] = useState(true)
 
   // Top-level app view
-  // 'home' => dashboard shell with Sales / Recruiting / Tasks / Reports tabs
+  // 'home'  => CRM Main (MainHome.jsx: Home / Sales / Recruiting / Tasks / Reports)
   // 'entry' => Sales Activity Entry (phone app replacement)
-  // 'sales' => Lead management list
   // 'admin' => dropdown option management
   const [view, setView] = useState('home')
 
@@ -32,6 +30,10 @@ function App() {
   const [loadingOptions, setLoadingOptions] = useState(true)
 
   const [statusMsg, setStatusMsg] = useState(null)
+
+  const isAdmin =
+    profile?.role === 'owner' ||
+    profile?.role === 'admin'
 
   // ---- AUTH / SESSION ----
   useEffect(() => {
@@ -190,11 +192,10 @@ function App() {
   if (!authUser) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4">
-        <h1 className="text-2xl font-semibold">CRM for Staffing</h1>
+        <h1 className="text-2xl font-semibold">CRM Staffing Sales</h1>
         <button
           type="button"
           onClick={handleSignIn}
-          className="px-4 py-2 rounded bg-blue-600 text-white text-sm font-medium"
         >
           Sign in with Google
         </button>
@@ -204,93 +205,105 @@ function App() {
 
   return (
     <>
-      {/* TOP BAR */}
-      <header className="w-full border-b bg-white">
-        <div className="max-w-6xl mx-auto flex items-center justify-between px-4 py-2 text-sm">
-          <div className="flex items-center gap-3">
-            <span className="font-semibold">CRM for Staffing</span>
-            {organizationId && (
-              <span className="text-xs text-gray-500">
-                Org: {organizationId.slice(0, 8)}…
-              </span>
-            )}
+      {/* HEADER (uses index.css styles) */}
+      <header>
+        <div className="header-inner">
+          <div className="brand">
+            <div className="brand-logo" />
+            <span>CRM Staffing Sales</span>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-gray-600">
+
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <div className="user-badge">
               {authUser.email}
               {profile?.role ? ` • ${profile.role}` : ''}
-            </span>
+            </div>
             <button
               type="button"
               onClick={handleSignOut}
-              className="px-2 py-1 rounded border text-xs"
+              style={{ background: '#0b2138' }}
             >
               Sign out
             </button>
           </div>
         </div>
-      </header>
 
-      {/* NAV TABS */}
-      <nav className="w-full border-b bg-slate-50">
-        <div className="max-w-6xl mx-auto flex gap-3 px-4 py-2 text-sm">
+        {/* Top nav buttons inside the header */}
+        <div
+          className="header-inner"
+          style={{
+            justifyContent: 'center',
+            gap: 8,
+            paddingTop: 4,
+            paddingBottom: 6,
+          }}
+        >
           <button
             type="button"
             onClick={() => setView('home')}
-            className={`px-3 py-1 rounded-full ${
-              view === 'home' ? 'bg-blue-600 text-white' : 'text-gray-700'
-            }`}
+            style={{
+              background: view === 'home' ? '#ffffff22' : 'transparent',
+              borderRadius: 9999,
+              padding: '6px 10px',
+              fontSize: '0.8rem',
+              boxShadow: 'none',
+            }}
           >
-            Home
+            CRM Main
           </button>
+
           <button
             type="button"
             onClick={() => setView('entry')}
-            className={`px-3 py-1 rounded-full ${
-              view === 'entry' ? 'bg-blue-600 text-white' : 'text-gray-700'
-            }`}
+            style={{
+              background: view === 'entry' ? '#ffffff22' : 'transparent',
+              borderRadius: 9999,
+              padding: '6px 10px',
+              fontSize: '0.8rem',
+              boxShadow: 'none',
+            }}
           >
             Sales Entry
           </button>
-          <button
-            type="button"
-            onClick={() => setView('sales')}
-            className={`px-3 py-1 rounded-full ${
-              view === 'sales' ? 'bg-blue-600 text-white' : 'text-gray-700'
-            }`}
-          >
-            Lead Management
-          </button>
-          <button
-            type="button"
-            onClick={() => setView('admin')}
-            className={`px-3 py-1 rounded-full ${
-              view === 'admin' ? 'bg-blue-600 text-white' : 'text-gray-700'
-            }`}
-          >
-            Admin
-          </button>
+
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => setView('admin')}
+              style={{
+                background: view === 'admin' ? '#ffffff22' : 'transparent',
+                borderRadius: 9999,
+                padding: '6px 10px',
+                fontSize: '0.8rem',
+                boxShadow: 'none',
+              }}
+            >
+              Admin
+            </button>
+          )}
         </div>
-      </nav>
+      </header>
 
-      {/* MAIN CONTENT */}
-      <main className="max-w-6xl mx-auto px-4 py-4">
-        {statusMsg && (
-          <div className="mb-3 text-xs text-red-700 bg-red-50 border border-red-100 px-3 py-2 rounded">
-            {statusMsg}
-          </div>
-        )}
+      {/* MAIN CONTENT (uses main + .card from index.css) */}
+      <main>
+        <div className="card">
+          {statusMsg && (
+            <div className="mb-3 text-xs text-red-700 bg-red-50 border border-red-100 px-3 py-2 rounded">
+              {statusMsg}
+            </div>
+          )}
 
-        {loadingOptions && (
-          <div className="mb-3 text-xs text-gray-600">
-            Loading dropdown options…
-          </div>
-        )}
+          {loadingOptions && (
+            <div className="mb-3 text-xs text-gray-600">
+              Loading dropdown options…
+            </div>
+          )}
 
-        {view === 'home' && <MainHome organizationId={organizationId} />}
+          {view === 'home' && (
+            <MainHome organizationId={organizationId} />
+          )}
 
-        {view === 'entry' && (
-          <div className="bg-white border rounded-xl shadow-sm p-4">
+          {view === 'entry' && (
             <SalesEntryForm
               organizationId={organizationId}
               currentUserId={authUser?.id}
@@ -300,26 +313,22 @@ function App() {
               buyingRoleOptions={buyingRoleOptions}
               callTypeOptions={callTypeOptions}
             />
-          </div>
-        )}
+          )}
 
-        {view === 'sales' && (
-          <div className="bg-white border rounded-xl shadow-sm p-4">
-            <LeadManagement organizationId={organizationId} />
-          </div>
-        )}
-
-        {view === 'admin' && (
-          <div className="bg-white border rounded-xl shadow-sm p-4">
-            <AdminOptions
-              organizationId={organizationId}
-              statusOptions={statusOptions}
-              ratingOptions={ratingOptions}
-              industryOptions={industryOptions}
-              reloadOptions={() => loadOptionLists(organizationId)}
-            />
-          </div>
-        )}
+          {view === 'admin' && (
+            isAdmin ? (
+              <AdminOptions
+                organizationId={organizationId}
+                statusOptions={statusOptions}
+                ratingOptions={ratingOptions}
+                industryOptions={industryOptions}
+                reloadOptions={() => loadOptionLists(organizationId)}
+              />
+            ) : (
+              <p>You don&apos;t have access to admin settings.</p>
+            )
+          )}
+        </div>
       </main>
     </>
   )

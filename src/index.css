@@ -342,3 +342,65 @@ button.primary {
     padding: 6px 8px;
   }
 }
+
+/* ===== Previous calls inline list ===== */
+.prev-calls {
+  margin-bottom: 12px;
+}
+
+.prev-calls-title {
+  margin-bottom: 6px;
+  font-weight: 800;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.prev-calls-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.prev-call-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  background: #f9fafb;
+  cursor: pointer;
+  text-align: left;
+}
+
+.prev-call-main {
+  font-size: 0.85rem;
+}
+
+.prev-call-meta {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.prev-call-distance {
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+/* On very small phones keep it tight */
+@media (max-width: 480px) {
+  .prev-call-item {
+    padding: 6px 8px;
+  }
+
+  .prev-call-main {
+    font-size: 0.8rem;
+  }
+
+  .prev-call-meta,
+  .prev-call-distance {
+    font-size: 0.7rem;
+  }
+}
