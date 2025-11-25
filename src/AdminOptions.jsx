@@ -16,48 +16,78 @@ function AdminOptions({ organizationId }) {
   const [newRating, setNewRating] = useState('')
   const [newIndustry, setNewIndustry] = useState('')
 
+  // --- DEBUG INFO ---
+  const [debugInfo, setDebugInfo] = useState(null)
+
   // ---- LOAD OPTIONS FOR THIS ORG ----
-async function loadOptions(orgId) {
-  setLoading(true)
-  setMessage(null)
-  setError(null)
+  async function loadOptions(orgId) {
+    if (!orgId) return
+    setLoading(true)
+    setMessage(null)
+    setError(null)
 
-  try {
-    const [statusRes, ratingRes, industryRes] = await Promise.all([
-      supabase
-        .from('call_status_options')
-        .select('*')
-        .order('sort_order', { ascending: true }),
-      supabase
-        .from('rating_options')
-        .select('*')
-        .order('sort_order', { ascending: true }),
-      supabase
-        .from('industry_options')
-        .select('*')
-        .order('sort_order', { ascending: true }),
-    ])
+    try {
+      const [statusRes, ratingRes, industryRes] = await Promise.all([
+        supabase
+          .from('call_status_options')
+          .select('*')
+          .eq('organization_id', orgId)
+          .order('sort_order', { ascending: true }),
+        supabase
+          .from('rating_options')
+          .select('*')
+          .eq('organization_id', orgId)
+          .order('sort_order', { ascending: true }),
+        supabase
+          .from('industry_options')
+          .select('*')
+          .eq('organization_id', orgId)
+          .order('sort_order', { ascending: true }),
+      ])
 
-    if (statusRes.error) throw statusRes.error
-    if (ratingRes.error) throw ratingRes.error
-    if (industryRes.error) throw industryRes.error
+      if (statusRes.error) throw statusRes.error
+      if (ratingRes.error) throw ratingRes.error
+      if (industryRes.error) throw industryRes.error
 
-    setStatusOptions(statusRes.data || [])
-    setRatingOptions(ratingRes.data || [])
-    setIndustryOptions(industryRes.data || [])
-  } catch (err) {
-    console.error('Error loading admin options', err)
-    setError(err.message || 'Error loading options.')
-  } finally {
-    setLoading(false)
+      setStatusOptions(statusRes.data || [])
+      setRatingOptions(ratingRes.data || [])
+      setIndustryOptions(industryRes.data || [])
+    } catch (err) {
+      console.error('Error loading admin options', err)
+      setError(err.message || 'Error loading options.')
+    } finally {
+      setLoading(false)
+    }
   }
-}
 
   useEffect(() => {
     if (organizationId) {
       loadOptions(organizationId)
     }
   }, [organizationId])
+
+  // ---- DEBUG: raw query without org filter ----
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const { data, error } = await supabase
+          .from('call_status_options')
+          .select('*')
+
+        setDebugInfo({
+          count: data?.length ?? 0,
+          error: error?.message || null,
+          sample: data && data.length > 0 ? data[0] : null,
+        })
+      } catch (e) {
+        setDebugInfo({
+          count: 0,
+          error: e.message || 'client error',
+          sample: null,
+        })
+      }
+    })()
+  }, [])
 
   // ---- HELPERS ----
   function nextSortOrder(list) {
@@ -376,6 +406,25 @@ async function loadOptions(orgId) {
         >
           {error}
         </p>
+      )}
+
+      {/* DEBUG BLOCK */}
+      {debugInfo && (
+        <pre
+          style={{
+            marginTop: 16,
+            fontSize: '10px',
+            color: '#6b7280',
+            background: '#f9fafb',
+            padding: 8,
+            borderRadius: 6,
+          }}
+        >
+{`DEBUG call_status_options:
+rows (no org filter): ${debugInfo.count}
+error: ${debugInfo.error || 'none'}
+sample row: ${debugInfo.sample ? JSON.stringify(debugInfo.sample, null, 2) : '(none)'}`}
+        </pre>
       )}
     </div>
   )

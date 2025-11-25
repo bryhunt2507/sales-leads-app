@@ -341,7 +341,6 @@ function App() {
     <p>You don&apos;t have access to admin settings.</p>
   )
 )}
-
         </div>
       </main>
     </>
