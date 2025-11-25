@@ -152,8 +152,8 @@ function AdminOptions({
     ])
 
     if (error) {
-      console.error(error)
-      setMessage('Error saving option.')
+      console.error('Error saving option:', error)
+      setMessage(`Error saving option: ${error.message || JSON.stringify(error)}`)
     } else {
       clearFn('')
       setMessage('Option added.')

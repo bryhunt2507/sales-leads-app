@@ -268,13 +268,7 @@ button.primary {
   font-weight: 700;
 }
 
-/* ========= Base responsive tweaks ========= */
 
-@media (max-width: 640px) {
-  .row {
-    flex-direction: column;
-  }
-}
 
 /* Extra-tight on very small phones */
 @media (max-width: 480px) {
