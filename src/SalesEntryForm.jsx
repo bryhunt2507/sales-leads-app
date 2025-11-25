@@ -46,7 +46,11 @@ function SalesEntryForm({
   const [previousCalls, setPreviousCalls] = useState([]) // up to 5
   const [previousCallsError, setPreviousCallsError] = useState(null)
 
-  const [loadingSuggested, setLoadingSuggested] = useState(false)
+  // Business suggestions (Google Places via Supabase function)
+  const [businessSuggestions, setBusinessSuggestions] = useState([])
+  const [loadingBiz, setLoadingBiz] = useState(false)
+  const [bizError, setBizError] = useState(null)
+
   const [suggestedMessage, setSuggestedMessage] = useState(null)
 
   // ---- FORM FIELDS ----
@@ -66,16 +70,16 @@ function SalesEntryForm({
   const [selectedCommonNote, setSelectedCommonNote] = useState('')
 
   const [imageFile, setImageFile] = useState(null)
-  const [imageLabel, setImageLabel] = useState('') // simple “Card selected” text
+  const [imageLabel, setImageLabel] = useState('')
 
-  const [selectedLead, setSelectedLead] = useState(null) // { id, ... }
+  const [selectedLead, setSelectedLead] = useState(null) // when following up on existing lead
 
   // ---- SUBMIT STATE ----
   const [submitting, setSubmitting] = useState(false)
   const [submitMessage, setSubmitMessage] = useState(null)
   const [submitError, setSubmitError] = useState(null)
 
-  // ========== GEOLOCATION ==========
+  // ================= GEOLOCATION (live for geofence toggle) =================
   useEffect(() => {
     if (!geofenceEnabled) return
     if (!navigator.geolocation) {
@@ -103,20 +107,50 @@ function SalesEntryForm({
     )
   }, [geofenceEnabled])
 
-  // ========== LOAD PREVIOUS CALLS (NEARBY) ==========
+  function getBrowserLocation() {
+    return new Promise((resolve, reject) => {
+      if (!('geolocation' in navigator)) {
+        reject(new Error('Geolocation not supported on this device.'))
+        return
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const { latitude, longitude } = pos.coords
+          resolve({ lat: latitude, lng: longitude })
+        },
+        (err) => reject(err),
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 30000,
+        },
+      )
+    })
+  }
+
+  async function ensureCoords() {
+    if (coords) return coords
+    const c = await getBrowserLocation()
+    setCoords(c)
+    return c
+  }
+
+  // ================= PREVIOUS CALLS (within ~300 ft) =================
   const loadPreviousCalls = useCallback(async () => {
     if (!organizationId) return
-    if (!coords) {
-      setPreviousCallsError('Location not available yet.')
-      setShowPreviousCalls(true)
-      return
-    }
 
     setShowPreviousCalls(true)
     setLoadingPreviousCalls(true)
     setPreviousCallsError(null)
 
     try {
+      const current = await ensureCoords()
+      if (!current) {
+        setPreviousCallsError('Location not available yet.')
+        return
+      }
+
       const { data, error } = await supabase
         .from('leads')
         .select(
@@ -150,8 +184,8 @@ function SalesEntryForm({
             return null
           }
           const d = distanceInMeters(
-            coords.lat,
-            coords.lng,
+            current.lat,
+            current.lng,
             row.latitude,
             row.longitude,
           )
@@ -170,28 +204,7 @@ function SalesEntryForm({
     }
   }, [organizationId, coords])
 
-  // ========== HELPERS ==========
-  function resetFormFields() {
-    setCompany('')
-    setContactName('')
-    setContactEmail('')
-    setContactPhone('')
-    setWebsite('')
-    setContactTitle('')
-    setBuyingRole('')
-    setIndustry('')
-    setStatus('')
-    setRating('')
-    setCallType('')
-    setNote('')
-    setFollowUpDate('')
-    setSelectedCommonNote('')
-    setImageFile(null)
-    setImageLabel('')
-    setSelectedLead(null)
-  }
-
-  function handleSelectPreviousCall(lead) {
+  function handlePickPreviousLead(lead) {
     setSelectedLead(lead)
     setCompany(lead.company || '')
     setContactName(lead.contact_name || '')
@@ -214,16 +227,16 @@ function SalesEntryForm({
     const last = call_history[call_history.length - 1]
     const date =
       last.date || last.timestamp || last.ts || last.created_at || null
-    const status = last.status || last.callType || last.type || ''
-    const rating = last.rating || ''
+    const stat = last.status || last.callType || last.type || ''
+    const r = last.rating || ''
     const parts = []
     if (date) parts.push(date)
-    if (status) parts.push(status)
-    if (rating) parts.push(`(${rating})`)
+    if (stat) parts.push(stat)
+    if (r) parts.push(`(${r})`)
     return parts.join(' • ')
   }
 
-  // Common note dropdown → append to note
+  // ================= COMMON NOTE DROPDOWN =================
   function handleCommonNoteChange(e) {
     const val = e.target.value
     setSelectedCommonNote(val)
@@ -236,26 +249,57 @@ function SalesEntryForm({
     setNote((prev) => (prev ? `${prev} ${toAppend}` : toAppend))
   }
 
-  // ========== SEARCH BUSINESS INFO (STUB) ==========
+  // ================= SEARCH BUSINESS INFO (SUPABASE FUNCTION) =================
   async function handleSearchBusinessInfo() {
     setSuggestedMessage(null)
+    setBizError(null)
 
-    if (!coords) {
-      setSuggestedMessage('Location not available yet.')
-      return
-    }
-
-    setLoadingSuggested(true)
     try {
-      setSuggestedMessage(
-        'Business suggestions will come from Google Places here (not wired yet in this version).',
+      const current = await ensureCoords()
+      if (!current) {
+        setSuggestedMessage('Location not available yet.')
+        return
+      }
+
+      setLoadingBiz(true)
+
+      const { data, error } = await supabase.functions.invoke(
+        'get-suggested-businesses',
+        {
+          body: { lat: current.lat, lon: current.lng },
+        },
       )
+
+      if (error) throw error
+      setBusinessSuggestions(data || [])
+      if (!data || data.length === 0) {
+        setSuggestedMessage('No nearby businesses found.')
+      } else {
+        setSuggestedMessage(
+          'Tap a business below to prefill company / phone / website.',
+        )
+      }
+    } catch (err) {
+      console.error('Business info error', err)
+      setBizError('Could not load nearby businesses. Check location + API key.')
     } finally {
-      setLoadingSuggested(false)
+      setLoadingBiz(false)
     }
   }
 
-  // ========== SCAN CARD BUTTON ==========
+  function applyBusinessSuggestion(biz) {
+    if (!biz) return
+    setCompany(biz.name || '')
+    if (biz.phone) setContactPhone(biz.phone)
+    if (biz.website) setWebsite(biz.website)
+    if (biz.address) {
+      setNote((prev) =>
+        prev ? `${prev}\nAddress: ${biz.address}` : `Address: ${biz.address}`,
+      )
+    }
+  }
+
+  // ================= SCAN CARD BUTTON (stub) =================
   function handleScanCardClick() {
     const input = document.getElementById('scanCardInput')
     if (input) input.click()
@@ -272,7 +316,28 @@ function SalesEntryForm({
     setImageLabel(file.name || 'Card image selected')
   }
 
-  // ========== SUBMIT ==========
+  // ================= RESET FORM =================
+  function resetFormFields() {
+    setCompany('')
+    setContactName('')
+    setContactEmail('')
+    setContactPhone('')
+    setWebsite('')
+    setContactTitle('')
+    setBuyingRole('')
+    setIndustry('')
+    setStatus('')
+    setRating('')
+    setCallType('')
+    setNote('')
+    setFollowUpDate('')
+    setSelectedCommonNote('')
+    setImageFile(null)
+    setImageLabel('')
+    setSelectedLead(null)
+  }
+
+  // ================= SUBMIT =================
   async function handleSubmit(e) {
     e.preventDefault()
     setSubmitting(true)
@@ -345,7 +410,7 @@ function SalesEntryForm({
           longitude: coords?.lng ?? null,
           location_raw:
             coords != null ? `${coords.lat},${coords.lng}` : null,
-          primary_image_url: null, // later: Supabase Storage URL
+          primary_image_url: null,
           call_history: [callRecord],
           note_history: [noteRecord],
           created_at: ts,
@@ -366,7 +431,7 @@ function SalesEntryForm({
     }
   }
 
-  // ========== RENDER ==========
+  // ================= RENDER =================
   return (
     <div>
       {/* Title */}
@@ -404,19 +469,11 @@ function SalesEntryForm({
           justifyContent: 'center',
         }}
       >
-        <button
-          type="button"
-          onClick={loadPreviousCalls}
-          disabled={loadingPreviousCalls}
-        >
+        <button type="button" onClick={loadPreviousCalls}>
           {loadingPreviousCalls ? 'Loading nearby calls…' : 'Select Previous Call'}
         </button>
-        <button
-          type="button"
-          onClick={handleSearchBusinessInfo}
-          disabled={loadingSuggested}
-        >
-          {loadingSuggested ? 'Searching…' : 'Search Business Info'}
+        <button type="button" onClick={handleSearchBusinessInfo}>
+          {loadingBiz ? 'Searching…' : 'Search Business Info'}
         </button>
       </div>
 
@@ -446,17 +503,120 @@ function SalesEntryForm({
         </div>
       )}
 
+      {/* Previous calls panel */}
+      {showPreviousCalls && (
+        <div className="card previous-calls-panel" style={{ marginBottom: 10 }}>
+          <div className="section-title">Previous calls within ~300 ft</div>
+          {loadingPreviousCalls && (
+            <p className="helper">Loading nearby calls…</p>
+          )}
+
+          {previousCallsError && (
+            <p className="helper" style={{ color: '#b91c1c' }}>
+              {previousCallsError}
+            </p>
+          )}
+
+          {!loadingPreviousCalls && previousCalls.length === 0 && !previousCallsError && (
+            <p className="helper">No recent nearby calls found.</p>
+          )}
+
+          {!loadingPreviousCalls && previousCalls.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {previousCalls.map((lead) => (
+                <button
+                  key={lead.id}
+                  type="button"
+                  className="lead-card"
+                  style={{
+                    textAlign: 'left',
+                    border:
+                      selectedLead && selectedLead.id === lead.id
+                        ? '2px solid #3b82f6'
+                        : undefined,
+                  }}
+                  onClick={() => handlePickPreviousLead(lead)}
+                >
+                  <div style={{ fontWeight: 700 }}>
+                    {lead.company || '(No company)'}{' '}
+                    <span style={{ fontWeight: 400, color: '#6b7280' }}>
+                      • {formatDistanceFeet(lead.distance_m)}
+                    </span>
+                  </div>
+                  {(lead.contact_name ||
+                    lead.contact_phone ||
+                    lead.contact_email) && (
+                    <div style={{ fontSize: '0.8rem', color: '#4b5563' }}>
+                      {lead.contact_name && <span>{lead.contact_name}</span>}
+                      {lead.contact_phone && (
+                        <span> • {lead.contact_phone}</span>
+                      )}
+                      {lead.contact_email && (
+                        <span> • {lead.contact_email}</span>
+                      )}
+                    </div>
+                  )}
+                  {lead.call_history && (
+                    <div
+                      style={{
+                        fontSize: '0.75rem',
+                        color: '#6b7280',
+                        marginTop: 2,
+                      }}
+                    >
+                      {lastCallSummary(lead.call_history)}
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Business suggestions list */}
+      {businessSuggestions.length > 0 && (
+        <div className="card business-suggestions-panel" style={{ marginBottom: 10 }}>
+          <div className="section-title">Nearby businesses</div>
+          {bizError && (
+            <p className="helper" style={{ color: '#b91c1c' }}>
+              {bizError}
+            </p>
+          )}
+          {suggestedMessage && (
+            <p className="helper" style={{ marginBottom: 4 }}>
+              {suggestedMessage}
+            </p>
+          )}
+          <ul className="business-suggestions-list" style={{ listStyle: 'none', paddingLeft: 0, margin: 0 }}>
+            {businessSuggestions.map((biz) => (
+              <li
+                key={biz.placeId || biz.name}
+                className="business-suggestion-item"
+                style={{
+                  border: '1px solid var(--border)',
+                  borderRadius: 14,
+                  padding: '6px 10px',
+                  marginBottom: 6,
+                  cursor: 'pointer',
+                }}
+                onClick={() => applyBusinessSuggestion(biz)}
+              >
+                <div>
+                  <strong>{biz.name}</strong>
+                </div>
+                <div className="helper">
+                  {biz.address}
+                  {biz.phone && ` • ${biz.phone}`}
+                  {biz.rating && ` • ⭐ ${biz.rating} (${biz.userRatingsTotal})`}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* Status banners */}
-      {loadingPreviousCalls && (
-        <div className="status-banner" style={{ marginBottom: 6 }}>
-          Processing nearby calls… Please wait.
-        </div>
-      )}
-      {loadingSuggested && (
-        <div className="status-banner" style={{ marginBottom: 6 }}>
-          Processing suggested business info… Please wait.
-        </div>
-      )}
       {submitMessage && (
         <div
           className="status-banner status-success"
@@ -465,74 +625,13 @@ function SalesEntryForm({
           {submitMessage}
         </div>
       )}
-      {(submitError || previousCallsError) && (
+      {submitError && (
         <div
           className="status-banner"
           style={{ marginBottom: 6, color: '#b91c1c' }}
         >
-          {submitError || previousCallsError}
+          {submitError}
         </div>
-      )}
-      {suggestedMessage && (
-        <div className="helper" style={{ marginBottom: 8 }}>
-          {suggestedMessage}
-        </div>
-      )}
-
-      {/* Previous calls list */}
-      {showPreviousCalls && previousCalls.length > 0 && (
-        <>
-          <div className="section-title">Previous calls nearby</div>
-          <div className="section-divider" />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {previousCalls.map((lead) => (
-              <button
-                key={lead.id}
-                type="button"
-                className="lead-card"
-                style={{
-                  textAlign: 'left',
-                  border:
-                    selectedLead && selectedLead.id === lead.id
-                      ? '2px solid #3b82f6'
-                      : undefined,
-                }}
-                onClick={() => handleSelectPreviousCall(lead)}
-              >
-                <div style={{ fontWeight: 700 }}>
-                  {lead.company || '(No company)'}{' '}
-                  <span style={{ fontWeight: 400, color: '#6b7280' }}>
-                    • {formatDistanceFeet(lead.distance_m)}
-                  </span>
-                </div>
-                {(lead.contact_name ||
-                  lead.contact_phone ||
-                  lead.contact_email) && (
-                  <div style={{ fontSize: '0.8rem', color: '#4b5563' }}>
-                    {lead.contact_name && <span>{lead.contact_name}</span>}
-                    {lead.contact_phone && (
-                      <span> • {lead.contact_phone}</span>
-                    )}
-                    {lead.contact_email && (
-                      <span> • {lead.contact_email}</span>
-                    )}
-                  </div>
-                )}
-                {lead.call_history && (
-                  <div
-                    style={{
-                      fontSize: '0.75rem',
-                      color: '#6b7280',
-                      marginTop: 2,
-                    }}
-                  >
-                    {lastCallSummary(lead.call_history)}
-                  </div>
-                )}
-              </button>
-            ))}
-          </div>
-        </>
       )}
 
       {/* Divider */}
