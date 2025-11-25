@@ -1,14 +1,13 @@
 // src/AdminOptions.jsx
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
 
-function AdminOptions({
-  organizationId,
-  statusOptions,
-  ratingOptions,
-  industryOptions,
-  reloadOptions,
-}) {
+function AdminOptions({ organizationId }) {
+  const [statusOptions, setStatusOptions] = useState([])
+  const [ratingOptions, setRatingOptions] = useState([])
+  const [industryOptions, setIndustryOptions] = useState([])
+
+  const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState(null)
   const [error, setError] = useState(null)
@@ -17,48 +16,68 @@ function AdminOptions({
   const [newRating, setNewRating] = useState('')
   const [newIndustry, setNewIndustry] = useState('')
 
-  if (!organizationId) {
-    return (
-      <div>
-        <h2 className="text-lg font-semibold mb-2">Admin Settings</h2>
-        <p className="helper">
-          No organization is selected. Admin options are disabled.
-        </p>
-      </div>
-    )
-  }
+  // ---- LOAD OPTIONS FOR THIS ORG ----
+  async function loadOptions(orgId) {
+    if (!orgId) return
+    setLoading(true)
+    setMessage(null)
+    setError(null)
 
-  function safeReload() {
     try {
-      if (reloadOptions) {
-        // handle both signatures: reloadOptions() or reloadOptions(orgId)
-        reloadOptions(organizationId)
-      }
-    } catch (e) {
-      console.warn('reloadOptions error (non-fatal):', e)
+      const [statusRes, ratingRes, industryRes] = await Promise.all([
+        supabase
+          .from('call_status_options')
+          .select('*')
+          .eq('organization_id', orgId)
+          .order('sort_order', { ascending: true }),
+        supabase
+          .from('rating_options')
+          .select('*')
+          .eq('organization_id', orgId)
+          .order('sort_order', { ascending: true }),
+        supabase
+          .from('industry_options')
+          .select('*')
+          .eq('organization_id', orgId)
+          .order('sort_order', { ascending: true }),
+      ])
+
+      if (statusRes.error) throw statusRes.error
+      if (ratingRes.error) throw ratingRes.error
+      if (industryRes.error) throw industryRes.error
+
+      setStatusOptions(statusRes.data || [])
+      setRatingOptions(ratingRes.data || [])
+      setIndustryOptions(industryRes.data || [])
+    } catch (err) {
+      console.error('Error loading admin options', err)
+      setError(err.message || 'Error loading options.')
+    } finally {
+      setLoading(false)
     }
   }
 
+  useEffect(() => {
+    if (organizationId) {
+      loadOptions(organizationId)
+    }
+  }, [organizationId])
+
+  // ---- HELPERS ----
   function nextSortOrder(list) {
     if (!Array.isArray(list) || list.length === 0) return 1
     const last = list[list.length - 1]
     return (typeof last.sort_order === 'number' ? last.sort_order : 0) + 1
   }
 
-  async function handleAdd(tableName, label, listSetter) {
-    if (!label.trim()) return
+  async function handleAdd(tableName, label, list, clearInput) {
+    if (!label.trim() || !organizationId) return
     setSaving(true)
     setMessage(null)
     setError(null)
 
     try {
-      let baseList
-      if (tableName === 'call_status_options') baseList = statusOptions
-      else if (tableName === 'rating_options') baseList = ratingOptions
-      else if (tableName === 'industry_options') baseList = industryOptions
-      else baseList = []
-
-      const sortOrder = nextSortOrder(baseList)
+      const sortOrder = nextSortOrder(list)
 
       const { error: insertError } = await supabase.from(tableName).insert({
         organization_id: organizationId,
@@ -70,9 +89,9 @@ function AdminOptions({
 
       if (insertError) throw insertError
 
-      listSetter('')
+      clearInput('')
       setMessage('Option added.')
-      safeReload()
+      await loadOptions(organizationId)
     } catch (err) {
       console.error('Add option error', err)
       setError(err.message || 'Error adding option.')
@@ -82,6 +101,7 @@ function AdminOptions({
   }
 
   async function handleUpdateLabel(tableName, optionId, newLabel) {
+    if (!organizationId) return
     setSaving(true)
     setMessage(null)
     setError(null)
@@ -98,7 +118,7 @@ function AdminOptions({
 
       if (updError) throw updError
       setMessage('Label updated.')
-      safeReload()
+      await loadOptions(organizationId)
     } catch (err) {
       console.error('Update label error', err)
       setError(err.message || 'Error updating label.')
@@ -108,6 +128,7 @@ function AdminOptions({
   }
 
   async function handleToggleActive(tableName, optionId, active) {
+    if (!organizationId) return
     setSaving(true)
     setMessage(null)
     setError(null)
@@ -121,7 +142,7 @@ function AdminOptions({
 
       if (updError) throw updError
       setMessage(active ? 'Option activated.' : 'Option deactivated.')
-      safeReload()
+      await loadOptions(organizationId)
     } catch (err) {
       console.error('Toggle active error', err)
       setError(err.message || 'Error updating active flag.')
@@ -133,6 +154,7 @@ function AdminOptions({
   async function handleMove(tableName, list, index, direction) {
     const targetIndex = index + direction
     if (!list || targetIndex < 0 || targetIndex >= list.length) return
+    if (!organizationId) return
 
     const current = list[index]
     const target = list[targetIndex]
@@ -143,13 +165,11 @@ function AdminOptions({
     setError(null)
 
     try {
-      // swap sort_order between current and target
       const { error: err1 } = await supabase
         .from(tableName)
         .update({ sort_order: target.sort_order })
         .eq('id', current.id)
         .eq('organization_id', organizationId)
-
       if (err1) throw err1
 
       const { error: err2 } = await supabase
@@ -157,11 +177,10 @@ function AdminOptions({
         .update({ sort_order: current.sort_order })
         .eq('id', target.id)
         .eq('organization_id', organizationId)
-
       if (err2) throw err2
 
       setMessage('Order updated.')
-      safeReload()
+      await loadOptions(organizationId)
     } catch (err) {
       console.error('Move option error', err)
       setError(err.message || 'Error changing order.')
@@ -223,6 +242,7 @@ function AdminOptions({
                 >
                   {opt.sort_order ?? idx + 1}
                 </span>
+
                 <input
                   type="text"
                   value={opt.label || ''}
@@ -231,6 +251,7 @@ function AdminOptions({
                   }
                   style={{ flex: 1 }}
                 />
+
                 <button
                   type="button"
                   onClick={() => handleMove(tableName, options, idx, -1)}
@@ -247,6 +268,7 @@ function AdminOptions({
                 >
                   ↓
                 </button>
+
                 <button
                   type="button"
                   onClick={() =>
@@ -269,7 +291,7 @@ function AdminOptions({
         <form
           onSubmit={(e) => {
             e.preventDefault()
-            handleAdd(tableName, newLabel, setNewLabel)
+            handleAdd(tableName, newLabel, options, setNewLabel)
           }}
           style={{ display: 'flex', gap: 8 }}
         >
@@ -287,6 +309,17 @@ function AdminOptions({
     )
   }
 
+  if (!organizationId) {
+    return (
+      <div>
+        <h2 className="text-lg font-semibold mb-2">Admin – Option Lists</h2>
+        <p className="helper">
+          No organization is selected. Admin options are disabled.
+        </p>
+      </div>
+    )
+  }
+
   return (
     <div>
       <h2 className="text-lg font-semibold mb-3">Admin – Option Lists</h2>
@@ -295,6 +328,12 @@ function AdminOptions({
         You can edit labels, change order, or disable options instead of
         deleting them.
       </p>
+
+      {loading && (
+        <p className="helper" style={{ marginBottom: 8 }}>
+          Loading options…
+        </p>
+      )}
 
       {renderOptionList({
         title: 'Call Status Options',

@@ -335,20 +335,13 @@ function App() {
           )}
 
           {view === 'admin' && (
-            isAdmin ? (
-              <AdminOptions
-                organizationId={organizationId}
-                statusOptions={statusOptions}
-                ratingOptions={ratingOptions}
-                industryOptions={industryOptions}
-                buyingRoleOptions={buyingRoleOptions}
-                callTypeOptions={callTypeOptions}
-                reloadOptions={() => loadOptionLists(organizationId)}
-              />
-            ) : (
-              <p>You don&apos;t have access to admin settings.</p>
-            )
-          )}
+  isAdmin ? (
+    <AdminOptions organizationId={organizationId} />
+  ) : (
+    <p>You don&apos;t have access to admin settings.</p>
+  )
+)}
+
         </div>
       </main>
     </>
