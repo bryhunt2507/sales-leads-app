@@ -147,6 +147,7 @@ function AdminOptions({
         organization_id: organizationId,
         label: label.trim(),
         sort_order: nextOrder,
+        active: true,
       },
     ])
 

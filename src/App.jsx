@@ -124,28 +124,47 @@ function App() {
             .from('call_status_options')
             .select('*')
             .eq('organization_id', orgId)
+            .eq('active', true)
             .order('sort_order', { ascending: true }),
           supabase
             .from('rating_options')
             .select('*')
             .eq('organization_id', orgId)
+            .eq('active', true)
             .order('sort_order', { ascending: true }),
           supabase
             .from('industry_options')
             .select('*')
             .eq('organization_id', orgId)
+            .eq('active', true)
             .order('sort_order', { ascending: true }),
           supabase
             .from('buying_role_options')
             .select('*')
             .eq('organization_id', orgId)
+            .eq('active', true)
             .order('sort_order', { ascending: true }),
           supabase
             .from('call_type_options')
             .select('*')
             .eq('organization_id', orgId)
+            .eq('active', true)
             .order('sort_order', { ascending: true }),
         ])
+
+      if (statusRes.error) console.error('Status options error:', statusRes.error)
+      if (ratingRes.error) console.error('Rating options error:', ratingRes.error)
+      if (industryRes.error) console.error('Industry options error:', industryRes.error)
+      if (buyingRes.error) console.error('Buying role options error:', buyingRes.error)
+      if (callTypeRes.error) console.error('Call type options error:', callTypeRes.error)
+
+      console.log('Loaded options:', {
+        status: statusRes.data?.length || 0,
+        rating: ratingRes.data?.length || 0,
+        industry: industryRes.data?.length || 0,
+        buying: buyingRes.data?.length || 0,
+        callType: callTypeRes.data?.length || 0,
+      })
 
       setStatusOptions(statusRes.data || [])
       setRatingOptions(ratingRes.data || [])
