@@ -74,6 +74,10 @@ function SalesEntryForm({
 
   const [selectedLead, setSelectedLead] = useState(null) // when following up on existing lead
 
+  // ---- SCAN CARD STATE ----
+  const [scanningCard, setScanningCard] = useState(false)
+  const [scanError, setScanError] = useState(null)
+
   // ---- SUBMIT STATE ----
   const [submitting, setSubmitting] = useState(false)
   const [submitMessage, setSubmitMessage] = useState(null)
@@ -299,21 +303,80 @@ function SalesEntryForm({
     }
   }
 
-  // ================= SCAN CARD BUTTON (stub) =================
+  // ================= SCAN CARD BUTTON =================
   function handleScanCardClick() {
     const input = document.getElementById('scanCardInput')
     if (input) input.click()
   }
 
-  function handleCardFileChange(e) {
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        const result = reader.result || ''
+        const str = typeof result === 'string' ? result : ''
+        const base64 = str.includes(',')
+          ? str.split(',')[1]
+          : str
+        resolve(base64)
+      }
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
+  }
+
+  async function handleCardFileChange(e) {
     const file = e.target.files?.[0]
     if (!file) {
       setImageFile(null)
       setImageLabel('')
       return
     }
+
     setImageFile(file)
     setImageLabel(file.name || 'Card image selected')
+    setScanError(null)
+    setScanningCard(true)
+
+    try {
+      const base64 = await fileToBase64(file)
+
+      const res = await fetch('/api/scan-card', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageBase64: base64 }),
+      })
+
+      const json = await res.json()
+
+      if (!res.ok || !json.ok) {
+        console.error('scan-card error:', json)
+        const msg = json.error || 'Card scan failed'
+        setScanError(msg)
+        alert(msg)
+        return
+      }
+
+      const data = json.data || {}
+
+      // Only fill empty fields so we don't stomp user edits
+      if (!company && data.company) setCompany(data.company)
+      if (!contactName && data.contact) setContactName(data.contact)
+      if (!contactTitle && data.contactTitle)
+        setContactTitle(data.contactTitle)
+      if (!contactEmail && data.email) setContactEmail(data.email)
+      if (!contactPhone && data.phone) setContactPhone(data.phone)
+      if (!website && data.website) setWebsite(data.website)
+    } catch (err) {
+      console.error('Card scan exception:', err)
+      const msg = 'Problem scanning card.'
+      setScanError(msg)
+      alert(msg)
+    } finally {
+      setScanningCard(false)
+      // allow re-selecting the same file
+      if (e.target) e.target.value = ''
+    }
   }
 
   // ================= RESET FORM =================
@@ -335,6 +398,7 @@ function SalesEntryForm({
     setImageFile(null)
     setImageLabel('')
     setSelectedLead(null)
+    setScanError(null)
   }
 
   // ================= SUBMIT =================
@@ -487,19 +551,29 @@ function SalesEntryForm({
           background: 'var(--navy)',
           borderRadius: 9999,
         }}
+        disabled={scanningCard}
       >
-        Scan Card (Optional)
+        {scanningCard ? 'Scanning card…' : 'Scan Card (Optional)'}
       </button>
       <input
         id="scanCardInput"
         type="file"
         accept="image/*"
+        capture="environment"
         style={{ display: 'none' }}
         onChange={handleCardFileChange}
       />
       {imageLabel && (
         <div className="helper" style={{ marginTop: 2, marginBottom: 4 }}>
           {imageLabel}
+        </div>
+      )}
+      {scanError && (
+        <div
+          className="helper"
+          style={{ marginTop: 2, marginBottom: 4, color: '#b91c1c' }}
+        >
+          {scanError}
         </div>
       )}
 
