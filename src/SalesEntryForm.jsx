@@ -37,15 +37,15 @@ function SalesEntryForm({
   commonNoteOptions = [],
 }) {
   // ---- GEO ----
-  const [geofenceEnabled, setGeofenceEnabled] = useState(true)
-  const [coords, setCoords] = useState(null) // { lat, lng }
-  const [geoError, setGeoError] = useState(null)
+  // ---- GEO / PREVIOUS CALLS ----
+const [geofenceEnabled, setGeofenceEnabled] = useState(true)
+const [coords, setCoords] = useState(null)
+const [geoError, setGeoError] = useState(null)
 
-  // ---- PREVIOUS CALLS (nearby + search modal) ----
-  const [previousCalls, setPreviousCalls] = useState([]) // nearby within radius
-  const [loadingPreviousCalls, setLoadingPreviousCalls] = useState(false)
-  const [previousCallsError, setPreviousCallsError] = useState(null)
-  const [showPrevModal, setShowPrevModal] = useState(false)
+const [showPreviousCalls, setShowPreviousCalls] = useState(false)
+const [loadingPreviousCalls, setLoadingPreviousCalls] = useState(false)
+const [previousCalls, setPreviousCalls] = useState([])
+const [previousCallsError, setPreviousCallsError] = useState(null)
 
   const [searchTerm, setSearchTerm] = useState('')
   const [searchResults, setSearchResults] = useState([])
@@ -143,70 +143,69 @@ function SalesEntryForm({
 
   // ================= PREVIOUS CALLS (within ~300 ft) =================
   const loadPreviousCalls = useCallback(async () => {
-    if (!organizationId) return
+  if (!organizationId) return
 
-    setLoadingPreviousCalls(true)
-    setPreviousCallsError(null)
+  setShowPreviousCalls(true)
+  setLoadingPreviousCalls(true)
+  setPreviousCallsError(null)
 
-    try {
-      const current = await ensureCoords()
-      if (!current) {
-        setPreviousCallsError('Location not available yet.')
-        return
-      }
-
-      const { data, error } = await supabase
-        .from('leads')
-        .select(
-          `
-          id,
-          company,
-          contact_name,
-          contact_email,
-          contact_phone,
-          status,
-          rating,
-          industry,
-          latitude,
-          longitude,
-          call_history
-        `,
-        )
-        .eq('org_id', organizationId)
-        .not('latitude', 'is', null)
-        .not('longitude', 'is', null)
-        .limit(250)
-
-      if (error) throw error
-
-      const withDistance = (data || [])
-        .map((row) => {
-          if (
-            typeof row.latitude !== 'number' ||
-            typeof row.longitude !== 'number'
-          ) {
-            return null
-          }
-          const d = distanceInMeters(
-            current.lat,
-            current.lng,
-            row.latitude,
-            row.longitude,
-          )
-          return { ...row, distance_m: d }
-        })
-        .filter((r) => r && r.distance_m <= GEOFENCE_RADIUS_M)
-        .sort((a, b) => a.distance_m - b.distance_m)
-        .slice(0, 5)
-
-      setPreviousCalls(withDistance)
-    } catch (err) {
-      console.error('Error loading previous calls', err)
-      setPreviousCallsError('Error loading previous calls.')
-    } finally {
-      setLoadingPreviousCalls(false)
+  try {
+    const current = await ensureCoords()
+    if (!current) {
+      setPreviousCallsError('Location not available yet.')
+      return
     }
-  }, [organizationId, coords])
+
+    const { data, error } = await supabase
+      .from('leads')
+      .select(`
+        id,
+        company,
+        contact_name,
+        contact_email,
+        contact_phone,
+        status,
+        rating,
+        industry,
+        latitude,
+        longitude,
+        call_history
+      `)
+      .eq('org_id', organizationId)
+      .not('latitude', 'is', null)
+      .not('longitude', 'is', null)
+      .limit(250)
+
+    if (error) throw error
+
+    const withDistance = (data || [])
+      .map((row) => {
+        if (
+          typeof row.latitude !== 'number' ||
+          typeof row.longitude !== 'number'
+        ) {
+          return null
+        }
+        const d = distanceInMeters(
+          current.lat,
+          current.lng,
+          row.latitude,
+          row.longitude,
+        )
+        return { ...row, distance_m: d }
+      })
+      .filter((r) => r && r.distance_m <= GEOFENCE_RADIUS_M)
+      .sort((a, b) => a.distance_m - b.distance_m)
+      .slice(0, 5)
+
+    setPreviousCalls(withDistance)
+  } catch (err) {
+    console.error('Error loading previous calls', err)
+    setPreviousCallsError('Error loading previous calls.')
+  } finally {
+    setLoadingPreviousCalls(false)
+  }
+}, [organizationId, coords])
 
   function openPreviousCallModal() {
     setShowPrevModal(true)
@@ -536,15 +535,13 @@ function SalesEntryForm({
           justifyContent: 'center',
         }}
       >
-        <button
+<button
   type="button"
-  onClick={() => {
-    setShowPreviousCalls(true)   // <- make the panel visible
-    loadPreviousCalls()          // <- fetch the nearby calls
-  }}
+  onClick={loadPreviousCalls}
 >
   {loadingPreviousCalls ? 'Loading nearby calls…' : 'Select Previous Call'}
 </button>
+
 
         <button type="button" onClick={handleSearchBusinessInfo}>
           {loadingBiz ? 'Searching…' : 'Search Business Info'}
