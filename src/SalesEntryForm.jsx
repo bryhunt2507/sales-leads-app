@@ -536,9 +536,16 @@ function SalesEntryForm({
           justifyContent: 'center',
         }}
       >
-        <button type="button" onClick={openPreviousCallModal}>
-          {loadingPreviousCalls ? 'Loading nearby calls…' : 'Select Previous Call'}
-        </button>
+        <button
+  type="button"
+  onClick={() => {
+    setShowPreviousCalls(true)   // <- make the panel visible
+    loadPreviousCalls()          // <- fetch the nearby calls
+  }}
+>
+  {loadingPreviousCalls ? 'Loading nearby calls…' : 'Select Previous Call'}
+</button>
+
         <button type="button" onClick={handleSearchBusinessInfo}>
           {loadingBiz ? 'Searching…' : 'Search Business Info'}
         </button>
