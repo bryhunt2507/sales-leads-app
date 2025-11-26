@@ -36,21 +36,26 @@ function SalesEntryForm({
   callTypeOptions,
   commonNoteOptions = [],
 }) {
-  // ---- GEO / PREVIOUS CALLS ----
+  // ---- GEO ----
   const [geofenceEnabled, setGeofenceEnabled] = useState(true)
   const [coords, setCoords] = useState(null) // { lat, lng }
   const [geoError, setGeoError] = useState(null)
 
-  const [showPreviousCalls, setShowPreviousCalls] = useState(false)
+  // ---- PREVIOUS CALLS (nearby + search modal) ----
+  const [previousCalls, setPreviousCalls] = useState([]) // nearby within radius
   const [loadingPreviousCalls, setLoadingPreviousCalls] = useState(false)
-  const [previousCalls, setPreviousCalls] = useState([]) // up to 5
   const [previousCallsError, setPreviousCallsError] = useState(null)
+  const [showPrevModal, setShowPrevModal] = useState(false)
 
-  // Business suggestions (Google Places via Supabase function)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [searchResults, setSearchResults] = useState([])
+  const [searchLoading, setSearchLoading] = useState(false)
+  const [searchError, setSearchError] = useState(null)
+
+  // ---- Business suggestions (Google Places via Supabase/worker) ----
   const [businessSuggestions, setBusinessSuggestions] = useState([])
   const [loadingBiz, setLoadingBiz] = useState(false)
   const [bizError, setBizError] = useState(null)
-
   const [suggestedMessage, setSuggestedMessage] = useState(null)
 
   // ---- FORM FIELDS ----
@@ -73,10 +78,6 @@ function SalesEntryForm({
   const [imageLabel, setImageLabel] = useState('')
 
   const [selectedLead, setSelectedLead] = useState(null) // when following up on existing lead
-
-  // ---- SCAN CARD STATE ----
-  const [scanningCard, setScanningCard] = useState(false)
-  const [scanError, setScanError] = useState(null)
 
   // ---- SUBMIT STATE ----
   const [submitting, setSubmitting] = useState(false)
@@ -144,7 +145,6 @@ function SalesEntryForm({
   const loadPreviousCalls = useCallback(async () => {
     if (!organizationId) return
 
-    setShowPreviousCalls(true)
     setLoadingPreviousCalls(true)
     setPreviousCallsError(null)
 
@@ -208,6 +208,18 @@ function SalesEntryForm({
     }
   }, [organizationId, coords])
 
+  function openPreviousCallModal() {
+    setShowPrevModal(true)
+    setSearchTerm('')
+    setSearchResults([])
+    setSearchError(null)
+    loadPreviousCalls()
+  }
+
+  function closePreviousCallModal() {
+    setShowPrevModal(false)
+  }
+
   function handlePickPreviousLead(lead) {
     setSelectedLead(lead)
     setCompany(lead.company || '')
@@ -217,6 +229,8 @@ function SalesEntryForm({
     setIndustry(lead.industry || '')
     setStatus(lead.status || '')
     setRating(lead.rating || '')
+    // close modal after selecting
+    setShowPrevModal(false)
   }
 
   function formatDistanceFeet(meters) {
@@ -238,6 +252,54 @@ function SalesEntryForm({
     if (stat) parts.push(stat)
     if (r) parts.push(`(${r})`)
     return parts.join(' • ')
+  }
+
+  // ================= SEARCH LEADS (name/email/phone) =================
+  async function handleSearchLeads(e) {
+    e.preventDefault()
+    const term = searchTerm.trim()
+    if (!term) {
+      setSearchResults([])
+      setSearchError(null)
+      return
+    }
+
+    setSearchLoading(true)
+    setSearchError(null)
+
+    try {
+      const { data, error } = await supabase
+        .from('leads')
+        .select(
+          `
+          id,
+          company,
+          contact_name,
+          contact_email,
+          contact_phone,
+          status,
+          rating,
+          industry,
+          latitude,
+          longitude,
+          call_history
+        `,
+        )
+        .eq('org_id', organizationId)
+        .or(
+          `company.ilike.%${term}%,contact_name.ilike.%${term}%,contact_email.ilike.%${term}%,contact_phone.ilike.%${term}%`,
+        )
+        .order('updated_at', { ascending: false })
+        .limit(25)
+
+      if (error) throw error
+      setSearchResults(data || [])
+    } catch (err) {
+      console.error('Search leads error', err)
+      setSearchError(err.message || 'Error searching leads.')
+    } finally {
+      setSearchLoading(false)
+    }
   }
 
   // ================= COMMON NOTE DROPDOWN =================
@@ -303,80 +365,22 @@ function SalesEntryForm({
     }
   }
 
-  // ================= SCAN CARD BUTTON =================
+  // ================= SCAN CARD BUTTON (still just picking file for now) =================
   function handleScanCardClick() {
     const input = document.getElementById('scanCardInput')
     if (input) input.click()
   }
 
-  function fileToBase64(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        const result = reader.result || ''
-        const str = typeof result === 'string' ? result : ''
-        const base64 = str.includes(',')
-          ? str.split(',')[1]
-          : str
-        resolve(base64)
-      }
-      reader.onerror = reject
-      reader.readAsDataURL(file)
-    })
-  }
-
-  async function handleCardFileChange(e) {
+  function handleCardFileChange(e) {
     const file = e.target.files?.[0]
     if (!file) {
       setImageFile(null)
       setImageLabel('')
       return
     }
-
     setImageFile(file)
     setImageLabel(file.name || 'Card image selected')
-    setScanError(null)
-    setScanningCard(true)
-
-    try {
-      const base64 = await fileToBase64(file)
-
-      const res = await fetch('/api/scan-card', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64: base64 }),
-      })
-
-      const json = await res.json()
-
-      if (!res.ok || !json.ok) {
-        console.error('scan-card error:', json)
-        const msg = json.error || 'Card scan failed'
-        setScanError(msg)
-        alert(msg)
-        return
-      }
-
-      const data = json.data || {}
-
-      // Only fill empty fields so we don't stomp user edits
-      if (!company && data.company) setCompany(data.company)
-      if (!contactName && data.contact) setContactName(data.contact)
-      if (!contactTitle && data.contactTitle)
-        setContactTitle(data.contactTitle)
-      if (!contactEmail && data.email) setContactEmail(data.email)
-      if (!contactPhone && data.phone) setContactPhone(data.phone)
-      if (!website && data.website) setWebsite(data.website)
-    } catch (err) {
-      console.error('Card scan exception:', err)
-      const msg = 'Problem scanning card.'
-      setScanError(msg)
-      alert(msg)
-    } finally {
-      setScanningCard(false)
-      // allow re-selecting the same file
-      if (e.target) e.target.value = ''
-    }
+    // OCR wiring lives in your Cloudflare function; we can hook it up next.
   }
 
   // ================= RESET FORM =================
@@ -398,7 +402,6 @@ function SalesEntryForm({
     setImageFile(null)
     setImageLabel('')
     setSelectedLead(null)
-    setScanError(null)
   }
 
   // ================= SUBMIT =================
@@ -533,7 +536,7 @@ function SalesEntryForm({
           justifyContent: 'center',
         }}
       >
-        <button type="button" onClick={loadPreviousCalls}>
+        <button type="button" onClick={openPreviousCallModal}>
           {loadingPreviousCalls ? 'Loading nearby calls…' : 'Select Previous Call'}
         </button>
         <button type="button" onClick={handleSearchBusinessInfo}>
@@ -551,102 +554,19 @@ function SalesEntryForm({
           background: 'var(--navy)',
           borderRadius: 9999,
         }}
-        disabled={scanningCard}
       >
-        {scanningCard ? 'Scanning card…' : 'Scan Card (Optional)'}
+        Scan Card (Optional)
       </button>
       <input
         id="scanCardInput"
         type="file"
         accept="image/*"
-        capture="environment"
         style={{ display: 'none' }}
         onChange={handleCardFileChange}
       />
       {imageLabel && (
         <div className="helper" style={{ marginTop: 2, marginBottom: 4 }}>
           {imageLabel}
-        </div>
-      )}
-      {scanError && (
-        <div
-          className="helper"
-          style={{ marginTop: 2, marginBottom: 4, color: '#b91c1c' }}
-        >
-          {scanError}
-        </div>
-      )}
-
-      {/* Previous calls panel */}
-      {showPreviousCalls && (
-        <div className="card previous-calls-panel" style={{ marginBottom: 10 }}>
-          <div className="section-title">Previous calls within ~300 ft</div>
-          {loadingPreviousCalls && (
-            <p className="helper">Loading nearby calls…</p>
-          )}
-
-          {previousCallsError && (
-            <p className="helper" style={{ color: '#b91c1c' }}>
-              {previousCallsError}
-            </p>
-          )}
-
-          {!loadingPreviousCalls &&
-            previousCalls.length === 0 &&
-            !previousCallsError && (
-              <p className="helper">No recent nearby calls found.</p>
-            )}
-
-          {!loadingPreviousCalls && previousCalls.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {previousCalls.map((lead) => (
-                <button
-                  key={lead.id}
-                  type="button"
-                  className="lead-card"
-                  style={{
-                    textAlign: 'left',
-                    border:
-                      selectedLead && selectedLead.id === lead.id
-                        ? '2px solid #3b82f6'
-                        : undefined,
-                  }}
-                  onClick={() => handlePickPreviousLead(lead)}
-                >
-                  <div style={{ fontWeight: 700 }}>
-                    {lead.company || '(No company)'}{' '}
-                    <span style={{ fontWeight: 400, color: '#6b7280' }}>
-                      • {formatDistanceFeet(lead.distance_m)}
-                    </span>
-                  </div>
-                  {(lead.contact_name ||
-                    lead.contact_phone ||
-                    lead.contact_email) && (
-                    <div style={{ fontSize: '0.8rem', color: '#4b5563' }}>
-                      {lead.contact_name && <span>{lead.contact_name}</span>}
-                      {lead.contact_phone && (
-                        <span> • {lead.contact_phone}</span>
-                      )}
-                      {lead.contact_email && (
-                        <span> • {lead.contact_email}</span>
-                      )}
-                    </div>
-                  )}
-                  {lead.call_history && (
-                    <div
-                      style={{
-                        fontSize: '0.75rem',
-                        color: '#6b7280',
-                        marginTop: 2,
-                      }}
-                    >
-                      {lastCallSummary(lead.call_history)}
-                    </div>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
         </div>
       )}
 
@@ -770,10 +690,7 @@ function SalesEntryForm({
             >
               <option value="">Select Buying Role</option>
               {buyingRoleOptions.map((opt) => (
-                <option
-                  key={opt.id}
-                  value={opt.value || opt.label}
-                >
+                <option key={opt.id} value={opt.value || opt.label}>
                   {opt.label}
                 </option>
               ))}
@@ -871,10 +788,7 @@ function SalesEntryForm({
             >
               <option value="">Select Call Type</option>
               {callTypeOptions.map((opt) => (
-                <option
-                  key={opt.id}
-                  value={opt.value || opt.label}
-                >
+                <option key={opt.id} value={opt.value || opt.label}>
                   {opt.label}
                 </option>
               ))}
@@ -892,10 +806,7 @@ function SalesEntryForm({
             >
               <option value="">Select Call Status</option>
               {statusOptions.map((opt) => (
-                <option
-                  key={opt.id}
-                  value={opt.value || opt.label}
-                >
+                <option key={opt.id} value={opt.value || opt.label}>
                   {opt.label}
                 </option>
               ))}
@@ -911,10 +822,7 @@ function SalesEntryForm({
             >
               <option value="">Industry (Required)</option>
               {industryOptions.map((opt) => (
-                <option
-                  key={opt.id}
-                  value={opt.value || opt.label}
-                >
+                <option key={opt.id} value={opt.value || opt.label}>
                   {opt.label}
                 </option>
               ))}
@@ -957,6 +865,203 @@ function SalesEntryForm({
           </button>
         </div>
       </form>
+
+      {/* PREVIOUS CALLS MODAL (nearby + search) */}
+      {showPrevModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15,23,42,0.45)',
+            zIndex: 60,
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'flex-start',
+            padding: '40px 12px 12px',
+          }}
+        >
+          <div
+            className="card"
+            style={{
+              maxWidth: 720,
+              width: '100%',
+              maxHeight: '100%',
+              overflowY: 'auto',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: 8,
+              }}
+            >
+              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800 }}>
+                Select Previous Call
+              </h3>
+              <button
+                type="button"
+                onClick={closePreviousCallModal}
+                style={{
+                  minHeight: 32,
+                  paddingInline: 10,
+                  background: '#0f172a',
+                }}
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="section-title">Nearby (within ~300 ft)</div>
+            <div className="section-divider" />
+
+            {loadingPreviousCalls && (
+              <p className="helper">Loading nearby calls…</p>
+            )}
+            {previousCallsError && (
+              <p className="helper" style={{ color: '#b91c1c' }}>
+                {previousCallsError}
+              </p>
+            )}
+            {!loadingPreviousCalls &&
+              !previousCallsError &&
+              previousCalls.length === 0 && (
+                <p className="helper">
+                  No previous calls found near your current location.
+                </p>
+              )}
+
+            {!loadingPreviousCalls && previousCalls.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {previousCalls.map((lead) => (
+                  <button
+                    key={lead.id}
+                    type="button"
+                    className="lead-card"
+                    style={{ textAlign: 'left' }}
+                    onClick={() => handlePickPreviousLead(lead)}
+                  >
+                    <div style={{ fontWeight: 700 }}>
+                      {lead.company || '(No company)'}{' '}
+                      <span style={{ fontWeight: 400, color: '#6b7280' }}>
+                        • {formatDistanceFeet(lead.distance_m)}
+                      </span>
+                    </div>
+                    {(lead.contact_name ||
+                      lead.contact_phone ||
+                      lead.contact_email) && (
+                      <div
+                        style={{ fontSize: '0.8rem', color: '#4b5563' }}
+                      >
+                        {lead.contact_name && <span>{lead.contact_name}</span>}
+                        {lead.contact_phone && (
+                          <span> • {lead.contact_phone}</span>
+                        )}
+                        {lead.contact_email && (
+                          <span> • {lead.contact_email}</span>
+                        )}
+                      </div>
+                    )}
+                    {lead.call_history && (
+                      <div
+                        style={{
+                          fontSize: '0.75rem',
+                          color: '#6b7280',
+                          marginTop: 2,
+                        }}
+                      >
+                        {lastCallSummary(lead.call_history)}
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Search section */}
+            <div className="section-title" style={{ marginTop: 16 }}>
+              Search by name, email, phone
+            </div>
+            <div className="section-divider" />
+
+            <form
+              onSubmit={handleSearchLeads}
+              style={{ display: 'flex', gap: 8, marginBottom: 8 }}
+            >
+              <input
+                type="text"
+                placeholder="Search company, contact, email, or phone"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              <button
+                type="submit"
+                disabled={searchLoading || !searchTerm.trim()}
+              >
+                {searchLoading ? 'Searching…' : 'Search'}
+              </button>
+            </form>
+
+            {searchError && (
+              <p className="helper" style={{ color: '#b91c1c' }}>
+                {searchError}
+              </p>
+            )}
+
+            {searchResults.length > 0 && (
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 6,
+                  marginTop: 4,
+                }}
+              >
+                {searchResults.map((lead) => (
+                  <button
+                    key={lead.id}
+                    type="button"
+                    className="lead-card"
+                    style={{ textAlign: 'left' }}
+                    onClick={() => handlePickPreviousLead(lead)}
+                  >
+                    <div style={{ fontWeight: 700 }}>
+                      {lead.company || '(No company)'}
+                    </div>
+                    {(lead.contact_name ||
+                      lead.contact_phone ||
+                      lead.contact_email) && (
+                      <div
+                        style={{ fontSize: '0.8rem', color: '#4b5563' }}
+                      >
+                        {lead.contact_name && <span>{lead.contact_name}</span>}
+                        {lead.contact_phone && (
+                          <span> • {lead.contact_phone}</span>
+                        )}
+                        {lead.contact_email && (
+                          <span> • {lead.contact_email}</span>
+                        )}
+                      </div>
+                    )}
+                    {lead.call_history && (
+                      <div
+                        style={{
+                          fontSize: '0.75rem',
+                          color: '#6b7280',
+                          marginTop: 2,
+                        }}
+                      >
+                        {lastCallSummary(lead.call_history)}
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
