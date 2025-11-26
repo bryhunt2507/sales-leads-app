@@ -60,6 +60,21 @@ function AdminOptions({ organizationId }) {
     }
   }
 
+  <button
+  type="button"
+  onClick={createDebugStatusRow}
+  style={{
+    marginTop: 12,
+    marginBottom: 4,
+    fontSize: '0.8rem',
+    background: '#334155',
+  }}
+  disabled={saving}
+>
+  Insert DEBUG_STATUS row into call_status_options
+</button>
+
+
   useEffect(() => {
     if (organizationId) {
       loadOptions(organizationId)
@@ -88,6 +103,42 @@ function AdminOptions({ organizationId }) {
       }
     })()
   }, [])
+
+  async function createDebugStatusRow() {
+  if (!organizationId) {
+    alert('No organizationId in app state');
+    return;
+  }
+
+  setSaving(true);
+  setMessage(null);
+  setError(null);
+
+  try {
+    const { data, error } = await supabase
+      .from('call_status_options')
+      .insert({
+        organization_id: organizationId,
+        label: 'DEBUG_STATUS',
+        value: 'DEBUG_STATUS',
+        sort_order: 999,
+        active: true,
+      })
+      .select('*');
+
+    if (error) throw error;
+
+    console.log('DEBUG_STATUS insert result from client:', data);
+    setMessage('DEBUG_STATUS row inserted from client.');
+    await loadOptions(organizationId);
+  } catch (err) {
+    console.error('createDebugStatusRow error', err);
+    setError(err.message || 'Error inserting DEBUG_STATUS row.');
+  } finally {
+    setSaving(false);
+  }
+}
+
 
   // ---- HELPERS ----
   function nextSortOrder(list) {
