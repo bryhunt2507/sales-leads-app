@@ -513,33 +513,49 @@ function SalesEntryForm({
         if (error) throw error
         setSubmitMessage('Follow-up saved to existing lead.')
       } else {
-        const payload = {
-          org_id: organizationId,
-          company: company || null,
-          contact_name: contactName || null,
-          contact_email: contactEmail || null,
-          contact_phone: contactPhone || null,
-          website: website || null,
-          contact_title: contactTitle || null,
-          buying_role: buyingRole || null,
-          industry: industry || null,
-          status: status || null,
-          rating: rating || null,
-          source: 'sales_entry',
-          owner_user_id: currentUserId || null,
-          created_by_user_id: currentUserId || null,
-          latitude: coords?.lat ?? null,
-          longitude: coords?.lng ?? null,
-          location_raw:
-            coords != null ? `${coords.lat},${coords.lng}` : null,
-          primary_image_url: null,
-          call_history: [callRecord],
-          note_history: [noteRecord],
-          created_at: ts,
-          updated_at: ts,
-        }
+      
+  // Try to make sure we have a fresh location when creating a new lead
+  let finalCoords = coords
+  if (geofenceEnabled) {
+    try {
+      finalCoords = await ensureCoords()
+    } catch (e) {
+      console.warn('[SUBMIT] could not refresh coords on submit', e)
+      // not fatal – we just won’t save lat/lng for this lead
+    }
+  }
 
-        const { error } = await supabase.from('leads').insert(payload)
+  const payload = {
+    org_id: organizationId,
+    company: company || null,
+    contact_name: contactName || null,
+    contact_email: contactEmail || null,
+    contact_phone: contactPhone || null,
+    website: website || null,
+    contact_title: contactTitle || null,
+    buying_role: buyingRole || null,
+    industry: industry || null,
+    status: status || null,
+    rating: rating || null,
+    source: 'sales_entry',
+    owner_user_id: currentUserId || null,
+    created_by_user_id: currentUserId || null,
+
+    // 👇 use the best coords we have
+    latitude: finalCoords?.lat ?? null,
+    longitude: finalCoords?.lng ?? null,
+    location_raw:
+      finalCoords != null ? `${finalCoords.lat},${finalCoords.lng}` : null,
+
+    primary_image_url: null,
+    call_history: [callRecord],
+    note_history: [noteRecord],
+    created_at: ts,
+    updated_at: ts,
+  }
+
+  const { error } = await supabase.from('leads').insert(payload)
+
         if (error) throw error
 
         setSubmitMessage('New lead saved. Ready for the next entry.')
