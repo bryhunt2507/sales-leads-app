@@ -187,7 +187,7 @@ function SalesEntryForm({
           call_history
         `,
           )
-          .eq('org_id', organizationId)
+          //.eq('org_id', organizationId) //
           .not('latitude', 'is', null)
           .not('longitude', 'is', null)
           .limit(250)
