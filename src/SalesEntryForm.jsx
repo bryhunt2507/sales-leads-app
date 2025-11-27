@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { supabase } from './supabaseClient'
 
 // Match your old GAS radius: 300 meters (~984 ft)
-const GEOFENCE_RADIUS_M = 300
+const GEOFENCE_RADIUS_M = 3000
 
 function distanceInMeters(lat1, lon1, lat2, lon2) {
   const R = 6371000 // meters
@@ -92,6 +92,9 @@ function SalesEntryForm({
   const [submitMessage, setSubmitMessage] = useState(null)
   const [submitError, setSubmitError] = useState(null)
 
+  const [geoDebug, setGeoDebug] = useState(null)
+
+
   // ================= GEOLOCATION =================
   useEffect(() => {
     if (!geofenceEnabled) return
@@ -154,26 +157,26 @@ function SalesEntryForm({
 
   // ================= PREVIOUS CALLS (within radius) =================
   const loadPreviousCalls = useCallback(
-    async (reason = 'manual') => {
-      if (!organizationId) return
+  async (reason = 'manual') => {
+    if (!organizationId) return
 
-      setLoadingPreviousCalls(true)
-      setPreviousCallsError(null)
+    setLoadingPreviousCalls(true)
+    setPreviousCallsError(null)
 
-      try {
-        const current = await ensureCoords()
-        if (!current) {
-          setPreviousCallsError('Location not available yet.')
-          return
-        }
+    try {
+      const current = await ensureCoords()
+      if (!current) {
+        setPreviousCallsError('Location not available yet.')
+        return
+      }
 
-        console.log('[PREV] loading nearby calls, reason:', reason)
-        console.log('[PREV] using coords:', current)
+      console.log('[PREV] loading nearby calls, reason:', reason)
+      console.log('[PREV] using coords:', current)
 
-        const { data, error } = await supabase
-          .from('leads')
-          .select(
-            `
+      const { data, error } = await supabase
+        .from('leads')
+        .select(
+          `
           id,
           company,
           contact_name,
@@ -186,63 +189,80 @@ function SalesEntryForm({
           longitude,
           call_history
         `,
-          )
-          //.eq('org_id', organizationId) //
-          .not('latitude', 'is', null)
-          .not('longitude', 'is', null)
-          .limit(250)
-
-        if (error) throw error
-
-        console.log('[PREV] total leads with lat/lng', data?.length || 0)
-
-        const withDistance = (data || [])
-  .map((row) => {
-    // Handle numeric OR string lat/lng from Supabase
-    const lat = typeof row.latitude === 'number'
-      ? row.latitude
-      : parseFloat(row.latitude)
-    const lng = typeof row.longitude === 'number'
-      ? row.longitude
-      : parseFloat(row.longitude)
-
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-      return null
-    }
-
-    const d = distanceInMeters(
-      current.lat,
-      current.lng,
-      lat,
-      lng,
-    )
-
-    return { ...row, latitude: lat, longitude: lng, distance_m: d }
-  })
-  .filter((r) => r && r.distance_m <= GEOFENCE_RADIUS_M)
-  .sort((a, b) => a.distance_m - b.distance_m)
-  .slice(0, 5)
-
-
-        console.log(
-          `[PREV] ${withDistance.length} leads within ${GEOFENCE_RADIUS_M}m`,
-          withDistance.map((r) => ({
-            id: r.id,
-            company: r.company,
-            distance_ft: (r.distance_m * 3.28084).toFixed(1),
-          })),
         )
+        .eq('org_id', organizationId)
+        .not('latitude', 'is', null)
+        .not('longitude', 'is', null)
+        .limit(250)
 
-        setPreviousCalls(withDistance)
-      } catch (err) {
-        console.error('Error loading previous calls', err)
-        setPreviousCallsError('Error loading previous calls.')
-      } finally {
-        setLoadingPreviousCalls(false)
-      }
-    },
-    [organizationId, coords],
-  )
+      if (error) throw error
+
+      console.log('[PREV] raw rows from Supabase:', data?.length || 0)
+
+      // 1) Compute distance for all rows with valid lat/lng
+      const withDistanceAll = (data || [])
+        .map((row) => {
+          const lat =
+            typeof row.latitude === 'number'
+              ? row.latitude
+              : parseFloat(row.latitude)
+          const lng =
+            typeof row.longitude === 'number'
+              ? row.longitude
+              : parseFloat(row.longitude)
+
+          if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+            return null
+          }
+
+          const d = distanceInMeters(current.lat, current.lng, lat, lng)
+
+          return {
+            ...row,
+            latitude: lat,
+            longitude: lng,
+            distance_m: d,
+          }
+        })
+        .filter((r) => r !== null)
+        .sort((a, b) => a.distance_m - b.distance_m)
+
+      // 2) Filter those within the geofence radius
+      const withinRadius = withDistanceAll
+        .filter((r) => r.distance_m <= GEOFENCE_RADIUS_M)
+        .slice(0, 5)
+
+      console.log(
+        `[PREV] ${withinRadius.length} leads within ${GEOFENCE_RADIUS_M}m`,
+        withinRadius.map((r) => ({
+          id: r.id,
+          company: r.company,
+          distance_ft: (r.distance_m * 3.28084).toFixed(1),
+        })),
+      )
+
+      setPreviousCalls(withinRadius)
+
+      // 3) Store a small debug snapshot for UI
+      setGeoDebug({
+        coords: current,
+        totalWithLatLng: withDistanceAll.length,
+        nearestSamples: withDistanceAll.slice(0, 5).map((r) => ({
+          company: r.company,
+          distance_m: r.distance_m,
+          distance_ft: r.distance_m * 3.28084,
+        })),
+      })
+    } catch (err) {
+      console.error('Error loading previous calls', err)
+      setPreviousCallsError('Error loading previous calls.')
+    } finally {
+      setLoadingPreviousCalls(false)
+    }
+  },
+  [organizationId, coords],
+)
+
 
   // Open / close modal
   function openPreviousCallModal() {
@@ -1094,6 +1114,33 @@ function SalesEntryForm({
           </div>
         </div>
       )}
+      {geoDebug && (
+  <pre
+    style={{
+      marginTop: 12,
+      fontSize: '10px',
+      background: '#f3f4f6',
+      padding: 8,
+      borderRadius: 6,
+      color: '#4b5563',
+      whiteSpace: 'pre-wrap',
+    }}
+  >
+{`GEO DEBUG
+coords: ${geoDebug.coords ? `${geoDebug.coords.lat.toFixed(6)}, ${geoDebug.coords.lng.toFixed(6)}` : 'none'}
+total leads with lat/lng: ${geoDebug.totalWithLatLng}
+nearest samples:
+${geoDebug.nearestSamples
+  .map(
+    (s, i) =>
+      `${i + 1}. ${s.company} – ${(s.distance_ft).toFixed(
+        1,
+      )} ft (${s.distance_m.toFixed(1)} m)`,
+  )
+  .join('\n')}`}
+  </pre>
+)}
+
     </div>
   )
 }
