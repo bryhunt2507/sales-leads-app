@@ -23,7 +23,7 @@ function distanceInMeters(lat1, lon1, lat2, lon2) {
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 
   return R * c
-} 
+}
 
 /**
  * Props:
@@ -197,24 +197,32 @@ function SalesEntryForm({
         console.log('[PREV] total leads with lat/lng', data?.length || 0)
 
         const withDistance = (data || [])
-          .map((row) => {
-            if (
-              typeof row.latitude !== 'number' ||
-              typeof row.longitude !== 'number'
-            ) {
-              return null
-            }
-            const d = distanceInMeters(
-              current.lat,
-              current.lng,
-              row.latitude,
-              row.longitude,
-            )
-            return { ...row, distance_m: d }
-          })
-          .filter((r) => r && r.distance_m <= GEOFENCE_RADIUS_M)
-          .sort((a, b) => a.distance_m - b.distance_m)
-          .slice(0, 5)
+  .map((row) => {
+    // Handle numeric OR string lat/lng from Supabase
+    const lat = typeof row.latitude === 'number'
+      ? row.latitude
+      : parseFloat(row.latitude)
+    const lng = typeof row.longitude === 'number'
+      ? row.longitude
+      : parseFloat(row.longitude)
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      return null
+    }
+
+    const d = distanceInMeters(
+      current.lat,
+      current.lng,
+      lat,
+      lng,
+    )
+
+    return { ...row, latitude: lat, longitude: lng, distance_m: d }
+  })
+  .filter((r) => r && r.distance_m <= GEOFENCE_RADIUS_M)
+  .sort((a, b) => a.distance_m - b.distance_m)
+  .slice(0, 5)
+
 
         console.log(
           `[PREV] ${withDistance.length} leads within ${GEOFENCE_RADIUS_M}m`,
