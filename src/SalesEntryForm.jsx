@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { supabase } from './supabaseClient'
 
 // Match your old GAS radius: 300 meters (~984 ft)
-const GEOFENCE_RADIUS_M = 3000
+const GEOFENCE_RADIUS_M = 300
 
 function distanceInMeters(lat1, lon1, lat2, lon2) {
   const R = 6371000 // meters
