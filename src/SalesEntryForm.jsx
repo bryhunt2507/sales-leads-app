@@ -460,7 +460,8 @@ function SalesEntryForm({
   }
 
   // ================= SUBMIT =================
-  async function handleSubmit(e) {
+  // ================= SUBMIT =================
+async function handleSubmit(e) {
   e.preventDefault()
   setSubmitting(true)
   setSubmitMessage(null)
@@ -469,19 +470,20 @@ function SalesEntryForm({
   try {
     const ts = new Date().toISOString()
 
-    // 🔥 Always try to grab a fresh location for this call
+    // 🔥 Use the SAME coord pipeline as geofence / business search
     let effectiveCoords = null
     try {
-      effectiveCoords = await getBrowserLocation()
-      console.log('[SUBMIT] fresh browser location', effectiveCoords)
-      setCoords(effectiveCoords) // keep state in sync
+      if (geofenceEnabled) {
+        effectiveCoords = await ensureCoords()
+      } else {
+        effectiveCoords = coords
+      }
     } catch (locErr) {
-      console.warn(
-        '[SUBMIT] could not refresh location, using existing coords state',
-        locErr,
-      )
+      console.warn('[SUBMIT] could not obtain coords, falling back to state', locErr)
       effectiveCoords = coords || null
     }
+
+    console.log('[SUBMIT] using coords for payload:', effectiveCoords)
 
     const callRecord = {
       date: ts,
@@ -501,89 +503,78 @@ function SalesEntryForm({
     }
 
     if (selectedLead) {
+      const existingCalls = Array.isArray(selectedLead.call_history)
+        ? selectedLead.call_history
+        : []
+      const newCalls = [...existingCalls, callRecord]
 
-        const existingCalls = Array.isArray(selectedLead.call_history)
-          ? selectedLead.call_history
-          : []
-        const newCalls = [...existingCalls, callRecord]
+      const { error } = await supabase
+        .from('leads')
+        .update({
+          company: company || null,
+          contact_name: contactName || null,
+          contact_email: contactEmail || null,
+          contact_phone: contactPhone || null,
+          website: website || null,
+          contact_title: contactTitle || null,
+          buying_role: buyingRole || null,
+          industry: industry || null,
+          status: status || null,
+          rating: rating || null,
+          call_history: newCalls,
+          updated_at: ts,
+        })
+        .eq('id', selectedLead.id)
 
-        const { error } = await supabase
-          .from('leads')
-          .update({
-            company: company || null,
-            contact_name: contactName || null,
-            contact_email: contactEmail || null,
-            contact_phone: contactPhone || null,
-            website: website || null,
-            contact_title: contactTitle || null,
-            buying_role: buyingRole || null,
-            industry: industry || null,
-            status: status || null,
-            rating: rating || null,
-            call_history: newCalls,
-            updated_at: ts,
-          })
-          .eq('id', selectedLead.id)
+      if (error) throw error
+      setSubmitMessage('Follow-up saved to existing lead.')
+    } else {
+      const payload = {
+        org_id: organizationId,
+        company: company || null,
+        contact_name: contactName || null,
+        contact_email: contactEmail || null,
+        contact_phone: contactPhone || null,
+        website: website || null,
+        contact_title: contactTitle || null,
+        buying_role: buyingRole || null,
+        industry: industry || null,
+        status: status || null,
+        rating: rating || null,
+        source: 'sales_entry',
+        owner_user_id: currentUserId || null,
+        created_by_user_id: currentUserId || null,
 
-        if (error) throw error
-        setSubmitMessage('Follow-up saved to existing lead.')
-      } else {
-      
-  // Try to make sure we have a fresh location when creating a new lead
-  let finalCoords = coords
-  if (geofenceEnabled) {
-    try {
-      finalCoords = await ensureCoords()
-    } catch (e) {
-      console.warn('[SUBMIT] could not refresh coords on submit', e)
-      // not fatal – we just won’t save lat/lng for this lead
-    }
-  }
+        // 👇 EXACT coords we’re using everywhere else
+        latitude: effectiveCoords?.lat ?? null,
+        longitude: effectiveCoords?.lng ?? null,
+        location_raw: effectiveCoords
+          ? `${effectiveCoords.lat},${effectiveCoords.lng}`
+          : null,
 
-  const payload = {
-    org_id: organizationId,
-    company: company || null,
-    contact_name: contactName || null,
-    contact_email: contactEmail || null,
-    contact_phone: contactPhone || null,
-    website: website || null,
-    contact_title: contactTitle || null,
-    buying_role: buyingRole || null,
-    industry: industry || null,
-    status: status || null,
-    rating: rating || null,
-    source: 'sales_entry',
-    owner_user_id: currentUserId || null,
-    created_by_user_id: currentUserId || null,
-
-    // 👇 use the best coords we have
-    latitude: effectiveCoords?.lat ?? null,
-  longitude: effectiveCoords?.lng ?? null,
-  location_raw: effectiveCoords
-    ? `${effectiveCoords.lat},${effectiveCoords.lng}`
-    : null,
-
-    primary_image_url: null,
-    call_history: [callRecord],
-    note_history: [noteRecord],
-    created_at: ts,
-    updated_at: ts,
-  }
-
-  const { error } = await supabase.from('leads').insert(payload)
-
-        if (error) throw error
-
-        setSubmitMessage('New lead saved. Ready for the next entry.')
-        resetFormFields()
+        primary_image_url: null,
+        call_history: [callRecord],
+        note_history: [noteRecord],
+        created_at: ts,
+        updated_at: ts,
       }
-    } catch (err) {
-      console.error('Submit error', err)
-      setSubmitError(err.message || 'Error saving entry.')
-    } finally {
-      setSubmitting(false)
+
+      console.log('[SUBMIT] payload we are inserting:', payload)
+
+      const { error } = await supabase.from('leads').insert(payload)
+      if (error) throw error
+
+      setSubmitMessage('New lead saved. Ready for the next entry.')
+      resetFormFields()
     }
+  } catch (err) {
+    console.error('Submit error', err)
+    setSubmitError(err.message || 'Error saving entry.')
+  } finally {
+    setSubmitting(false)
   }
+}
+
 
   // ================= RENDER =================
   return (
