@@ -156,7 +156,7 @@ function SalesEntryForm({
   }
 
   // ================= PREVIOUS CALLS (within radius) =================
-  const loadPreviousCalls = useCallback(
+const loadPreviousCalls = useCallback(
   async (reason = 'manual') => {
     if (!organizationId) return
 
@@ -187,19 +187,21 @@ function SalesEntryForm({
           industry,
           latitude,
           longitude,
-          call_history
+          call_history,
+          created_at
         `,
         )
         .eq('org_id', organizationId)
         .not('latitude', 'is', null)
         .not('longitude', 'is', null)
-        .limit(250)
+        .order('created_at', { ascending: false })
+        // 🔥 scan up to 10k leads for this org
+        .limit(100000)
 
       if (error) throw error
 
       console.log('[PREV] raw rows from Supabase:', data?.length || 0)
 
-      // 1) Compute distance for all rows with valid lat/lng
       const withDistanceAll = (data || [])
         .map((row) => {
           const lat =
@@ -227,7 +229,6 @@ function SalesEntryForm({
         .filter((r) => r !== null)
         .sort((a, b) => a.distance_m - b.distance_m)
 
-      // 2) Filter those within the geofence radius
       const withinRadius = withDistanceAll
         .filter((r) => r.distance_m <= GEOFENCE_RADIUS_M)
         .slice(0, 5)
@@ -243,7 +244,6 @@ function SalesEntryForm({
 
       setPreviousCalls(withinRadius)
 
-      // 3) Store a small debug snapshot for UI
       setGeoDebug({
         coords: current,
         totalWithLatLng: withDistanceAll.length,
