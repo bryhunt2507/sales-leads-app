@@ -55,8 +55,15 @@ export const SalesEntryForm: React.FC<Props> = ({
     loading: loadingBiz,
     error: bizError,
     message: suggestedMessage,
-    load: searchBusinesses,
+    search: searchBusinesses,
   } = useBusinessSuggestions()
+
+  // inside SalesEntryForm component
+
+function handleSearchNearbyBusinesses() {
+  // coords is already coming from your geolocation hook / state
+  searchBusinesses(coords)
+}
 
   const [showPrevModal, setShowPrevModal] = useState(false)
 
@@ -272,19 +279,27 @@ export const SalesEntryForm: React.FC<Props> = ({
         </div>
       )}
 
-      {/* Top actions */}
-      <div
-        className="top-actions"
-        style={{ marginTop: 12, marginBottom: 8, display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}
-      >
-        <button type="button" onClick={openPreviousCallModal}>
-          {loadingPrevious ? 'Loading nearby calls…' : 'Select Previous Call'}
-        </button>
+      {/* Top action buttons */}
+<div
+  className="top-actions"
+  style={{
+    marginTop: 12,
+    marginBottom: 8,
+    display: 'flex',
+    gap: 8,
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+  }}
+>
+  <button type="button" onClick={openPreviousCallModal}>
+    {loadingPrevious ? 'Loading nearby calls…' : 'Select Previous Call'}
+  </button>
 
-        <button type="button" onClick={() => searchBusinesses(coords || null)}>
-          {loadingBiz ? 'Searching…' : 'Search Business Info'}
-        </button>
-      </div>
+  <button type="button" onClick={handleSearchNearbyBusinesses}>
+    {loadingBiz ? 'Searching…' : 'Search Nearby Businesses'}
+  </button>
+</div>
+
 
       {/* Scan Card */}
       <button

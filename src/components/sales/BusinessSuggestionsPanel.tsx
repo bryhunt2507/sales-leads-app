@@ -56,4 +56,4 @@ export const BusinessSuggestionsPanel: React.FC<Props> = ({
       </ul>
     </div>
   )
-}
+} 

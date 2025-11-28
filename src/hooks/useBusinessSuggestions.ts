@@ -1,45 +1,43 @@
 // src/hooks/useBusinessSuggestions.ts
-import { useState, useCallback } from 'react'
-import type { LatLng } from '../utils/geo'
+import { useState } from 'react'
 import { supabase } from '../supabaseClient'
+import type { LatLng } from '../utils/geo'
 
 export interface BusinessSuggestion {
+  placeId?: string
   name: string
   address?: string
   phone?: string
+  website?: string
   rating?: number
   userRatingsTotal?: number
-  website?: string
-  placeId?: string
 }
 
-interface State {
+interface Result {
   suggestions: BusinessSuggestion[]
   loading: boolean
   error: string | null
   message: string | null
+  // call this from the button, passing current coords
+  search: (coords: LatLng | null) => Promise<void>
 }
 
-export function useBusinessSuggestions() {
-  const [state, setState] = useState<State>({
-    suggestions: [],
-    loading: false,
-    error: null,
-    message: null,
-  })
+export function useBusinessSuggestions(): Result {
+  const [suggestions, setSuggestions] = useState<BusinessSuggestion[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [message, setMessage] = useState<string | null>(null)
 
-  const load = useCallback(async (coords: LatLng | null) => {
+  async function search(coords: LatLng | null) {
+    setError(null)
+    setMessage(null)
+
     if (!coords) {
-      setState((s) => ({
-        ...s,
-        suggestions: [],
-        message: 'Location not available yet.',
-      }))
+      setMessage('Location not available yet.')
       return
     }
 
-    setState((s) => ({ ...s, loading: true, error: null, message: null }))
-
+    setLoading(true)
     try {
       const { data, error } = await supabase.functions.invoke(
         'get-suggested-businesses',
@@ -50,27 +48,26 @@ export function useBusinessSuggestions() {
 
       if (error) throw error
 
-      const suggestions = (data || []) as BusinessSuggestion[]
-      setState((s) => ({
-        ...s,
-        suggestions,
-        message:
-          suggestions.length === 0
-            ? 'No nearby businesses found.'
-            : 'Tap a business below to prefill company / phone / website.',
-      }))
-    } catch (err: any) {
-      console.error('Business suggestions error', err)
-      setState((s) => ({
-        ...s,
-        error:
-          err.message ??
-          'Could not load nearby businesses. Check location + API key.',
-      }))
-    } finally {
-      setState((s) => ({ ...s, loading: false }))
-    }
-  }, [])
+      const list = (data || []) as BusinessSuggestion[]
 
-  return { ...state, load }
+      // keep it to the closest 5, just like the old app
+      const top = list.slice(0, 5)
+
+      setSuggestions(top)
+      setMessage(
+        top.length
+          ? 'Tap a business below to prefill company / phone / website.'
+          : 'No nearby businesses found.',
+      )
+    } catch (err) {
+      console.error('Business suggestions error', err)
+      setError('Could not load nearby businesses. Check location + API key.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return { suggestions, loading, error, message, search }
 }
+
+export default useBusinessSuggestions
