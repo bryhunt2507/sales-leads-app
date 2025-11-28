@@ -461,32 +461,47 @@ function SalesEntryForm({
 
   // ================= SUBMIT =================
   async function handleSubmit(e) {
-    e.preventDefault()
-    setSubmitting(true)
-    setSubmitMessage(null)
-    setSubmitError(null)
+  e.preventDefault()
+  setSubmitting(true)
+  setSubmitMessage(null)
+  setSubmitError(null)
 
+  try {
+    const ts = new Date().toISOString()
+
+    // 🔥 Always try to grab a fresh location for this call
+    let effectiveCoords = null
     try {
-      const ts = new Date().toISOString()
+      effectiveCoords = await getBrowserLocation()
+      console.log('[SUBMIT] fresh browser location', effectiveCoords)
+      setCoords(effectiveCoords) // keep state in sync
+    } catch (locErr) {
+      console.warn(
+        '[SUBMIT] could not refresh location, using existing coords state',
+        locErr,
+      )
+      effectiveCoords = coords || null
+    }
 
-      const callRecord = {
-        date: ts,
-        status: status || null,
-        rating: rating || null,
-        call_type: callType || null,
-        note: note || '',
-        user_id: currentUserId || null,
-      }
+    const callRecord = {
+      date: ts,
+      status: status || null,
+      rating: rating || null,
+      call_type: callType || null,
+      note: note || '',
+      user_id: currentUserId || null,
+    }
 
-      const noteRecord = {
-        date: ts,
-        noteType: status || null,
-        text: note || '',
-        followUpDate: followUpDate || null,
-        enteredByUserId: currentUserId || null,
-      }
+    const noteRecord = {
+      date: ts,
+      noteType: status || null,
+      text: note || '',
+      followUpDate: followUpDate || null,
+      enteredByUserId: currentUserId || null,
+    }
 
-      if (selectedLead) {
+    if (selectedLead) {
+
         const existingCalls = Array.isArray(selectedLead.call_history)
           ? selectedLead.call_history
           : []
@@ -542,10 +557,11 @@ function SalesEntryForm({
     created_by_user_id: currentUserId || null,
 
     // 👇 use the best coords we have
-    latitude: finalCoords?.lat ?? null,
-    longitude: finalCoords?.lng ?? null,
-    location_raw:
-      finalCoords != null ? `${finalCoords.lat},${finalCoords.lng}` : null,
+    latitude: effectiveCoords?.lat ?? null,
+  longitude: effectiveCoords?.lng ?? null,
+  location_raw: effectiveCoords
+    ? `${effectiveCoords.lat},${effectiveCoords.lng}`
+    : null,
 
     primary_image_url: null,
     call_history: [callRecord],
