@@ -1,12 +1,13 @@
+import { useBusinessSuggestions } from '../../hooks/useBusinessSuggestions'
+import { BusinessSuggestionsPanel } from './BusinessSuggestionsPanel'
+
 // src/components/sales/SalesEntryForm.tsx
 import React, { useState } from 'react'
 // src/components/sales/SalesEntryForm.tsx
 import { useGeolocation } from '../../hooks/useGeolocation'
 import { usePreviousCalls } from '../../hooks/usePreviousCalls'
 import { useLeadSearch } from '../../hooks/useLeadSearch'
-import { useBusinessSuggestions } from '../../hooks/useBusinessSuggestions'
 import { PreviousCallsModal } from './PreviousCallsModal'
-import { BusinessSuggestionsPanel } from './BusinessSuggestionsPanel'
 import { insertLead, updateLead, Lead } from '../../services/leadService'
 
 interface Props {
@@ -50,13 +51,17 @@ export const SalesEntryForm: React.FC<Props> = ({
     runSearch,
   } = useLeadSearch(organizationId)
 
-  const {
-    suggestions: businessSuggestions,
-    loading: loadingBiz,
-    error: bizError,
-    message: suggestedMessage,
-    search: searchBusinesses,
-  } = useBusinessSuggestions()
+// ---- Business suggestions (Google Places via Supabase function) ----
+const {
+  suggestions: businessSuggestions,
+  loading: loadingBiz,
+  error: bizError,
+  message: suggestedMessage,
+  search: searchBusinesses,
+} = useBusinessSuggestions()
+
+const [showBusinessModal, setShowBusinessModal] = useState(false)
+
 
   // inside SalesEntryForm component
 
@@ -91,6 +96,7 @@ function handleSearchNearbyBusinesses() {
   const [submitMessage, setSubmitMessage] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
+
   function openPreviousCallModal() {
     setShowPrevModal(true)
     loadPrevious(coords || null)
@@ -122,6 +128,14 @@ function handleSearchNearbyBusinesses() {
     const input = document.getElementById('scanCardInput') as HTMLInputElement | null
     if (input) input.click()
   }
+
+function handleOpenBusinessModal() {
+  setShowBusinessModal(true)
+  // Let the hook do its thing (it will use coords internally
+  // or however you wired it)
+  searchBusinesses(coords)
+}
+
 
   function handleCardFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -295,9 +309,9 @@ function handleSearchNearbyBusinesses() {
     {loadingPrevious ? 'Loading nearby calls…' : 'Select Previous Call'}
   </button>
 
-  <button type="button" onClick={handleSearchNearbyBusinesses}>
-    {loadingBiz ? 'Searching…' : 'Search Nearby Businesses'}
-  </button>
+  <button type="button" onClick={handleOpenBusinessModal}>
+  {loadingBiz ? 'Searching nearby…' : 'Search Nearby Businesses'}
+</button>
 </div>
 
 
