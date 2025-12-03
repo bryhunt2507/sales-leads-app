@@ -16,6 +16,13 @@ function distanceInMeters(lat1, lon1, lat2, lon2) {
       Math.sin(dLon / 2) *
       Math.sin(dLon / 2)
 
+
+    // ---- Business suggestions (Google Places via Supabase function) ----
+  const [businessSuggestions, setBusinessSuggestions] = useState<any[]>([])
+  const [loadingBiz, setLoadingBiz] = useState(false)
+  const [bizError, setBizError] = useState<string | null>(null)
+  const [suggestedMessage, setSuggestedMessage] = useState<string | null>(null)
+
   // ❌ BAD (what you have right now)
   // const c = 2 * Math.atan2(Math.sqrt(1 - a), Math.sqrt(a))
 
@@ -421,6 +428,48 @@ const loadPreviousCalls = useCallback(
     }
   }
 
+    // ================= SEARCH NEARBY BUSINESSES (SUPABASE FUNCTION) =================
+  async function handleSearchBusinessInfo() {
+    setSuggestedMessage(null)
+    setBizError(null)
+
+    try {
+      const current = await ensureCoords()
+      if (!current) {
+        setSuggestedMessage('Location not available yet.')
+        return
+      }
+
+      setLoadingBiz(true)
+
+      const { data, error } = await supabase.functions.invoke(
+        'get-suggested-businesses',
+        {
+          body: { lat: current.lat, lon: current.lng },
+        },
+      )
+
+      if (error) throw error
+
+      const list = data || []
+      setBusinessSuggestions(list)
+
+      if (!list.length) {
+        setSuggestedMessage('No nearby businesses found.')
+      } else {
+        setSuggestedMessage(
+          'Tap a business below to prefill company / phone / website.',
+        )
+      }
+    } catch (err) {
+      console.error('Business info error', err)
+      setBizError('Could not load nearby businesses. Check location + API key.')
+    } finally {
+      setLoadingBiz(false)
+    }
+  }
+
+
   // ================= SCAN CARD BUTTON (file only for now) =================
   function handleScanCardClick() {
     const input = document.getElementById('scanCardInput')
@@ -618,9 +667,9 @@ async function handleSubmit(e) {
           {loadingPreviousCalls ? 'Loading nearby calls…' : 'Select Previous Call'}
         </button>
 
-        <button type="button" onClick={handleSearchBusinessInfo}>
-          {loadingBiz ? 'Searching…' : 'Search Business Info'}
-        </button>
+          <button type="button" onClick={handleSearchBusinessInfo}>
+    {loadingBiz ? 'Searching…' : 'Search Nearby Businesses'}
+  </button>
       </div>
 
       {/* Scan Card button bar */}
