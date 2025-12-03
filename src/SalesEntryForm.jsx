@@ -18,10 +18,10 @@ function distanceInMeters(lat1, lon1, lat2, lon2) {
 
 
     // ---- Business suggestions (Google Places via Supabase function) ----
-  const [businessSuggestions, setBusinessSuggestions] = useState<any[]>([])
+  const [businessSuggestions, setBusinessSuggestions] = useState([])
   const [loadingBiz, setLoadingBiz] = useState(false)
-  const [bizError, setBizError] = useState<string | null>(null)
-  const [suggestedMessage, setSuggestedMessage] = useState<string | null>(null)
+  const [bizError, setBizError] = useState(null)
+  const [suggestedMessage, setSuggestedMessage] = useState(null)
 
   // ❌ BAD (what you have right now)
   // const c = 2 * Math.atan2(Math.sqrt(1 - a), Math.sqrt(a))
