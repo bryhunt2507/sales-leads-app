@@ -16,21 +16,10 @@ function distanceInMeters(lat1, lon1, lat2, lon2) {
       Math.sin(dLon / 2) *
       Math.sin(dLon / 2)
 
-
-    // ---- Business suggestions (Google Places via Supabase function) ----
-  const [businessSuggestions, setBusinessSuggestions] = useState([])
-  const [loadingBiz, setLoadingBiz] = useState(false)
-  const [bizError, setBizError] = useState(null)
-  const [suggestedMessage, setSuggestedMessage] = useState(null)
-
-  // ❌ BAD (what you have right now)
-  // const c = 2 * Math.atan2(Math.sqrt(1 - a), Math.sqrt(a))
-
-  // ✅ GOOD – standard haversine formula
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-
   return R * c
 }
+
 
 /**
  * Props:
@@ -378,58 +367,9 @@ const loadPreviousCalls = useCallback(
     setNote((prev) => (prev ? `${prev} ${toAppend}` : toAppend))
   }
 
-  // ================= SEARCH BUSINESS INFO (SUPABASE FUNCTION) =================
-  async function handleSearchBusinessInfo() {
-    setSuggestedMessage(null)
-    setBizError(null)
-
-    try {
-      const current = await ensureCoords()
-      if (!current) {
-        setSuggestedMessage('Location not available yet.')
-        return
-      }
-
-      setLoadingBiz(true)
-
-      const { data, error } = await supabase.functions.invoke(
-        'get-suggested-businesses',
-        {
-          body: { lat: current.lat, lon: current.lng },
-        },
-      )
-
-      if (error) throw error
-      setBusinessSuggestions(data || [])
-      if (!data || data.length === 0) {
-        setSuggestedMessage('No nearby businesses found.')
-      } else {
-        setSuggestedMessage(
-          'Tap a business below to prefill company / phone / website.',
-        )
-      }
-    } catch (err) {
-      console.error('Business info error', err)
-      setBizError('Could not load nearby businesses. Check location + API key.')
-    } finally {
-      setLoadingBiz(false)
-    }
-  }
-
-  function applyBusinessSuggestion(biz) {
-    if (!biz) return
-    setCompany(biz.name || '')
-    if (biz.phone) setContactPhone(biz.phone)
-    if (biz.website) setWebsite(biz.website)
-    if (biz.address) {
-      setNote((prev) =>
-        prev ? `${prev}\nAddress: ${biz.address}` : `Address: ${biz.address}`,
-      )
-    }
-  }
 
     // ================= SEARCH NEARBY BUSINESSES (SUPABASE FUNCTION) =================
-  async function handleSearchBusinessInfo() {
+    async function handleSearchBusinessInfo() {
     setSuggestedMessage(null)
     setBizError(null)
 
@@ -444,9 +384,7 @@ const loadPreviousCalls = useCallback(
 
       const { data, error } = await supabase.functions.invoke(
         'get-suggested-businesses',
-        {
-          body: { lat: current.lat, lon: current.lng },
-        },
+        { body: { lat: current.lat, lon: current.lng } },
       )
 
       if (error) throw error
@@ -457,17 +395,16 @@ const loadPreviousCalls = useCallback(
       if (!list.length) {
         setSuggestedMessage('No nearby businesses found.')
       } else {
-        setSuggestedMessage(
-          'Tap a business below to prefill company / phone / website.',
-        )
+        setSuggestedMessage('Tap a business below to use it as this lead.')
       }
     } catch (err) {
       console.error('Business info error', err)
-      setBizError('Could not load nearby businesses. Check location + API key.')
+      setBizError('Could not load nearby businesses. (Function missing or blocked)')
     } finally {
       setLoadingBiz(false)
     }
   }
+
 
 
   // ================= SCAN CARD BUTTON (file only for now) =================
@@ -667,9 +604,10 @@ async function handleSubmit(e) {
           {loadingPreviousCalls ? 'Loading nearby calls…' : 'Select Previous Call'}
         </button>
 
-          <button type="button" onClick={handleSearchBusinessInfo}>
-    {loadingBiz ? 'Searching…' : 'Search Nearby Businesses'}
-  </button>
+       <button type="button" onClick={handleSearchBusinessInfo}>
+  {loadingBiz ? 'Searching…' : 'Search Nearby Businesses'}
+</button>
+
       </div>
 
       {/* Scan Card button bar */}
