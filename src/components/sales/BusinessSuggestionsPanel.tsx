@@ -1,6 +1,14 @@
 // src/components/sales/BusinessSuggestionsPanel.tsx
 import React from 'react'
-import { BusinessSuggestion } from '../../hooks/useBusinessSuggestions.ts'
+
+interface BusinessSuggestion {
+  placeId?: string
+  name: string
+  address?: string
+  phone?: string
+  rating?: number
+  userRatingsTotal?: number
+}
 
 interface Props {
   suggestions: BusinessSuggestion[]
@@ -8,7 +16,6 @@ interface Props {
   error: string | null
   onSelect: (biz: BusinessSuggestion) => void
 }
-
 export const BusinessSuggestionsPanel: React.FC<Props> = ({
   suggestions,
   message,

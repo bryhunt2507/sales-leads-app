@@ -1,4 +1,4 @@
-import { useBusinessSuggestions } from '../../hooks/useBusinessSuggestions'
+import { useBusinessSuggestions } from '../../hooks/UseBusinessSuggestions'
 import { BusinessSuggestionsPanel } from './BusinessSuggestionsPanel'
 
 // src/components/sales/SalesEntryForm.tsx
@@ -67,7 +67,7 @@ const [showBusinessModal, setShowBusinessModal] = useState(false)
 
 function handleSearchNearbyBusinesses() {
   // coords is already coming from your geolocation hook / state
-  searchBusinesses(coords)
+  searchBusinesses()
 }
 
   const [showPrevModal, setShowPrevModal] = useState(false)
@@ -133,7 +133,7 @@ function handleOpenBusinessModal() {
   setShowBusinessModal(true)
   // Let the hook do its thing (it will use coords internally
   // or however you wired it)
-  searchBusinesses(coords)
+  searchBusinesses()
 }
 
 
