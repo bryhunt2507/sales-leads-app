@@ -1,5 +1,13 @@
 // functions/api/ocr.js
 export async function onRequestPost({ request, env }) {
+  // Handle CORS preflight
+  if (request.method === 'OPTIONS') {
+    return new Response(null, {
+      status: 204,
+      headers: corsHeaders(),
+    })
+  }
+
   try {
     const { imageBase64 } = await request.json()
 
@@ -89,8 +97,17 @@ export async function onRequestPost({ request, env }) {
 function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: Object.assign({ 'Content-Type': 'application/json' }, corsHeaders()),
   })
+}
+
+function corsHeaders() {
+  return {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Max-Age': '600',
+  }
 }
 
 // Simple parser; we can refine based on real cards later

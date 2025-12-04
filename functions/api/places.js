@@ -4,6 +4,13 @@
 export async function onRequest(context) {
   const { request, env } = context
 
+  // handle CORS preflight
+  if (request.method === 'OPTIONS') {
+    return new Response(null, {
+      status: 204,
+      headers: corsHeaders(),
+    })
+  }
   const url = new URL(request.url)
   const lat = url.searchParams.get('lat')
   const lng = url.searchParams.get('lng')
@@ -100,9 +107,15 @@ export async function onRequest(context) {
 function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: {
-      'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': '*',
-    },
+    headers: Object.assign({ 'Content-Type': 'application/json' }, corsHeaders()),
   })
+}
+
+function corsHeaders() {
+  return {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Max-Age': '600',
+  }
 }

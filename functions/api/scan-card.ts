@@ -3,6 +3,12 @@ interface Env {
   GOOGLE_VISION_API_KEY: string
 }
 
+type PagesFunction<Env = any> = (context: {
+  request: Request
+  env: Env
+  params?: Record<string, string>
+}) => Promise<Response>
+
 type ParsedCard = {
   company: string
   contact: string
@@ -15,7 +21,7 @@ type ParsedCard = {
 export const onRequestPost: PagesFunction<Env> = async (context) => {
   try {
     const { request, env } = context
-    const { imageBase64 } = await request.json<any>()
+    const { imageBase64 } = (await request.json()) as any
 
     if (!imageBase64 || typeof imageBase64 !== 'string') {
       return jsonResponse({ error: 'imageBase64 is required' }, 400)
@@ -85,6 +91,15 @@ function jsonResponse(body: any, status = 200): Response {
     status,
     headers: { 'Content-Type': 'application/json' },
   })
+}
+
+function corsHeaders(): Record<string, string> {
+  return {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Max-Age': '600',
+  }
 }
 
 /**
